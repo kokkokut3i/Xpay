@@ -39,8 +39,9 @@ const HomeTab = ({
   handleSelectPackage
 }) => {
   return (
-    <ScrollView showsVerticalScrollIndicator={false} style={styles.scrollArea}>
-      <View style={styles.header}>
+    <View style={{ flex: 1, backgroundColor: '#0F0F14' }}>
+      {/* Хөдөлгөөнгүй байх толгой хэсэг */}
+      <View style={[styles.header, { paddingHorizontal: 20, paddingTop: 0, paddingBottom: 0, backgroundColor: '#0F0F14' }]}>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           <View style={styles.headerLogo}>
             <Text style={styles.headerLogoText}>X</Text>
@@ -60,6 +61,9 @@ const HomeTab = ({
         </View>
       </View>
 
+      {/* Гүйдэг контент хэсэг */}
+      <ScrollView showsVerticalScrollIndicator={false} style={styles.scrollArea}>
+        <View style={{ paddingHorizontal: 0 }}>
       <View style={styles.walletCard}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <Text style={styles.walletLabel}>{T.home.mainNum}: {userPhone || '95335501'}</Text>
@@ -170,8 +174,10 @@ const HomeTab = ({
         <Feather name="chevron-right" size={20} color="#6B7280" />
       </TouchableOpacity>
 
+        </View>
+      </ScrollView>
       <View style={{ height: 100 }} />
-    </ScrollView>
+    </View>
   );
 };
 

@@ -6,7 +6,6 @@ import {
   ActivityIndicator,
   Alert,
   Modal,
-  Platform,
   ScrollView,
   StatusBar,
   Text,
@@ -20,7 +19,6 @@ import { styles } from '../../my-payment-app/styles';
 import { translations } from '../../my-payment-app/translations';
 
 // Компонентуудыг импортлох
-import { AuthChangeEvent, Session } from '@supabase/supabase-js';
 import AiChatModal from '../../my-payment-app/AiChatModal';
 import AllServicesModal from '../../my-payment-app/AllServicesModal';
 import AuthScreen from '../../my-payment-app/AuthScreen';
@@ -62,7 +60,19 @@ export default function Index() {
   const [lastPaymentDate, setLastPaymentDate] = useState<string | null>(null);
   const [mainData, setMainData] = useState(0);
   const [unitBalance, setUnitBalance] = useState(0);
-  const [customAlert, setCustomAlert] = useState({ visible: false, message: '' });
+  const [customAlert, setCustomAlert] = useState<{
+    visible: boolean;
+    message: string;
+    buttons?: { text: string; style?: 'cancel' | 'default'; onPress: () => void }[];
+  }>({ visible: false, message: '' });
+  
+  const [inputDialog, setInputDialog] = useState({
+    visible: false,
+    title: '',
+    placeholder: '',
+    secureTextEntry: false,
+    onConfirm: (text: string) => {},
+  });
   const [authName, setAuthName] = useState('');
   const [authPhone, setAuthPhone] = useState('');
   const [authPass, setAuthPass] = useState('');
@@ -83,6 +93,16 @@ export default function Index() {
   const [cardNumber, setCardNumber] = useState('');
   const [autoPayEnabled, setAutoPayEnabled] = useState(true);
   const [biometricsEnabled, setBiometricsEnabled] = useState(false);
+  const [serviceType, setServiceType] = useState('postpaid'); // 'prepaid' or 'postpaid'
+  
+  // Багцын мэдээлэл
+  const availablePackages = [
+    { id: 'standard', name: 'Стандарт багц', price: 25000, desc: 'Үндсэн хэрэглээнд' },
+    { id: 'unlimited', name: 'Хязгааргүй дата', price: 35000, desc: 'Дата хэрэглээ өндөр хүмүүст' },
+    { id: 'premium', name: 'Премиум багц', price: 55000, desc: 'Бүх үйлчилгээг багтаасан' },
+  ];
+  const [activePackage, setActivePackage] = useState(availablePackages[0]);
+  const [nextPackage, setNextPackage] = useState<any>(null);
 
   const banks = [
     { id: 'khan', name: 'Хаан банк', color: '#10B981' },
@@ -332,12 +352,123 @@ export default function Index() {
     });
   };
 
+  // --- НЭР СОЛИХ ФУНКЦ ---
+  const handleUpdateName = async (newName: string) => {
+    if (!userId || !newName || newName.trim() === '') return;
+    setInputDialog({ ...inputDialog, visible: false });
+
+    // Auth user update
+    const { data: { user }, error: userError } = await supabase.auth.updateUser({ data: { full_name: newName } });
+    // Profile table update
+    const { error: profileError } = await supabase.from('profiles').update({ full_name: newName }).eq('id', userId);
+
+    if (userError || profileError) {
+      setCustomAlert({ visible: true, message: 'Нэр солих үед алдаа гарлаа.' });
+    } else {
+      setUserName(newName);
+      addNotification('Амжилттай', 'Таны нэр амжилттай солигдлоо.', 'check-circle', '#10B981');
+    }
+  };
+
+  // --- НУУЦ ҮГ СОЛИХ ФУНКЦ ---
+  const handleUpdatePassword = async (newPassword: string) => {
+    if (!newPassword || newPassword.length < 6) {
+      setInputDialog({ ...inputDialog, visible: false });
+      setCustomAlert({ visible: true, message: 'Нууц үг 6-аас доошгүй тэмдэгттэй байх ёстой.' });
+      return;
+    }
+    setInputDialog({ ...inputDialog, visible: false });
+
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) {
+      setCustomAlert({ visible: true, message: 'Нууц үг солих үед алдаа гарлаа.' });
+    } else {
+      addNotification('Амжилттай', 'Нууц үг амжилттай солигдлоо.', 'check-circle', '#10B981');
+    }
+  };
+
+  // --- БАГЦ СОЛИХ ФУНКЦ ---
+  const handlePackageChange = async (selectedPkg: any) => {
+    if (!userId || !isBillPaid) return;
+
+    setCustomAlert({
+      visible: true,
+      message: `Та дараа сараас идэвхжих багцаа "${selectedPkg.name}" болгохдоо итгэлтэй байна уу?`,
+      buttons: [
+        {
+          text: "Цуцлах",
+          style: "cancel",
+          onPress: () => setCustomAlert({ visible: false, message: '' })
+        },
+        {
+          text: "Тийм",
+          onPress: async () => {
+            const { error } = await supabase.from('profiles').update({ next_package: selectedPkg.id }).eq('id', userId);
+            if (error) {
+              setCustomAlert({ visible: true, message: 'Багц солих үед алдаа гарлаа.', buttons: [] });
+            } else {
+              setNextPackage(selectedPkg);
+              setCustomAlert({ visible: true, message: `Амжилттай! Таны багц дараа сараас ${selectedPkg.name} болон солигдоно.`, buttons: [] });
+            }
+          }
+        }
+      ]
+    });
+  };
+
+  // --- ҮЙЛЧИЛГЭЭНИЙ ТӨРӨЛ СОЛИХ ---
+  const handleServiceTypeChange = async (newType: 'prepaid' | 'postpaid') => {
+    if (!userId || serviceType === newType) return;
+
+    setServiceType(newType); // Optimistic update
+    const { error } = await supabase
+        .from('profiles')
+        .update({ service_type: newType })
+        .eq('id', userId);
+
+    if (error) {
+        setCustomAlert({ visible: true, message: 'Үйлчилгээний төрөл солиход алдаа гарлаа.' });
+        setServiceType(serviceType as 'prepaid' | 'postpaid'); // Revert on error
+    }
+  };
+
+  // --- ШИЛЖҮҮЛЭГ ХИЙХ ФУНКЦ ---
+  const handleTransfer = async ({ method, target, type, value }: { method: 'phone' | 'account' | null; target: string; type: string; value: any }): Promise<boolean> => {
+    if (!userId) return false;
+
+    try {
+      if (method !== 'phone') {
+        throw new Error("Одоогоор зөвхөн утасны дугаараар шилжүүлэх боломжтой.");
+      }
+
+      const { data: result, error } = await supabase.rpc('execute_transfer', {
+        sender_id: userId,
+        recipient_phone: target,
+        transfer_type: type,
+        transfer_value: type === 'data' ? value : parseInt(value)
+      });
+
+      if (error) throw error;
+
+      if (result !== 'Амжилттай') {
+        throw new Error((result as string).replace('Алдаа: ', ''));
+      }
+
+      addNotification('Шилжүүлэг амжилттай', `${target} руу ${type === 'data' ? value.name : parseInt(value) + (type === 'money' ? '₮' : ' нэгж')} шилжүүллээ.`, 'send', '#10B981');
+      setCustomAlert({ visible: true, message: 'Амжилттай! Шилжүүлэг хийгдлээ.' });
+      return true;
+    } catch (err: any) {
+      setCustomAlert({ visible: true, message: err.message });
+      return false;
+    }
+  };
+
   // Хэрэглэгчийн мэдээллийг Supabase-ээс татах функц
   const fetchUserProfile = async (uid: string) => {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('full_name, phone, balance, data_gb, unit_balance, is_bill_paid, last_payment_date, saved_cards')
+        .select('full_name, phone, balance, data_gb, unit_balance, is_bill_paid, last_payment_date, saved_cards, active_package, next_package, service_type')
         .eq('id', uid)
         .maybeSingle();
 
@@ -347,9 +478,40 @@ export default function Index() {
         setMainBalance(Number(data.balance));
         setMainData(Number(data.data_gb));
         setUnitBalance(Number(data.unit_balance));
-        setIsBillPaid(data.is_bill_paid || false);
-        setLastPaymentDate(data.last_payment_date || null);
         setSavedCards(data.saved_cards || []);
+        setServiceType(data.service_type || 'postpaid');
+        
+        const currentPkg = availablePackages.find(p => p.id === data.active_package) || availablePackages[0];
+        const upcomingPkg = availablePackages.find(p => p.id === data.next_package);
+        setActivePackage(currentPkg);
+        setNextPackage(upcomingPkg || null);
+
+        // Төлбөрийн төлөвийг сар шалгаж шинэчлэх
+        const lastPaid = data.last_payment_date ? new Date(data.last_payment_date) : null;
+        const now = new Date();
+        let updates: any = {};
+        let needsUpdate = false;
+
+        if (lastPaid && lastPaid.getMonth() === now.getMonth() && lastPaid.getFullYear() === now.getFullYear()) {
+          // Энэ сард төлсөн бол төлсөн төлөвт үлдээх
+          setIsBillPaid(true);
+          setLastPaymentDate(data.last_payment_date);
+        } else {
+          // Сар солигдсон бол төлбөрийн төлөвийг шинэчлэх
+          setIsBillPaid(false);
+          setLastPaymentDate(null);
+          updates = { is_bill_paid: false, last_payment_date: null };
+          needsUpdate = true;
+
+          // Хэрэв дараа сарын багц сонгосон байвал түүнийг идэвхжүүлэх
+          if (upcomingPkg) {
+            setActivePackage(upcomingPkg);
+            setNextPackage(null);
+            updates = { ...updates, active_package: upcomingPkg.id, next_package: null };
+          }
+
+          if (needsUpdate) await supabase.from('profiles').update(updates).eq('id', uid);
+        }
       }
     } catch (error) {
       console.error('Error fetching profile:', error);
@@ -357,41 +519,23 @@ export default function Index() {
   };
 
   useEffect(() => {
-    // Апп ачаалагдах үед нэвтэрсэн хэрэглэгчийн session байгаа эсэхийг шалгах
-    const checkSession = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-          setIsAuthenticated(true);
-          setUserId(session.user.id);
-          fetchUserProfile(session.user.id);
-        }
-      } catch (err) {
-        console.error("Auth session check error:", err);
-      } finally {
-        setIsLoading(false);
+    const checkInitialSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        setIsAuthenticated(true);
+        setUserId(session.user.id);
+        fetchUserProfile(session.user.id);
       }
+      setIsLoading(false);
     };
 
-    checkSession();
+    checkInitialSession();
 
-    // Нэвтрэх төлөв өөрчлөгдөхийг сонсох
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setIsAuthenticated(!!session);
-      setUserId(session?.user.id || null);
+      setUserId(session?.user.id ?? null);
       if (session) {
-        setUserName(session.user.user_metadata?.full_name || '');
-        setAuthPhone(session.user.user_metadata?.phone || session.user.email?.split('@')[0] || '');
         fetchUserProfile(session.user.id);
-      } else {
-        setUserName('');
-        setAuthPhone('');
-        setMainBalance(0);
-        setMainData(0);
-        setUnitBalance(0);
-        setIsBillPaid(false);
-        setLastPaymentDate(null);
-        setSavedCards([]);
       }
     });
 
@@ -421,6 +565,9 @@ export default function Index() {
             setIsBillPaid(payload.new.is_bill_paid);
             setLastPaymentDate(payload.new.last_payment_date);
             setSavedCards(payload.new.saved_cards || []);
+            if (payload.new.active_package) setActivePackage(availablePackages.find(p => p.id === payload.new.active_package) || availablePackages[0]);
+            if (payload.new.service_type) setServiceType(payload.new.service_type);
+            if (payload.new.next_package) setNextPackage(availablePackages.find(p => p.id === payload.new.next_package) || null);
           }
         }
       )
@@ -522,7 +669,7 @@ export default function Index() {
   }
 
   return (
-    <SafeAreaView style={[styles.container, { paddingTop: 0 }]} edges={['left', 'right', 'bottom']}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
       
       {toast.visible && (
@@ -551,7 +698,7 @@ export default function Index() {
             handleAuth={handleAuth} 
           />
         ) : (
-          <View style={{ flex: 1, paddingTop: Platform.OS === 'android' ? 10 : 10 }}>
+          <View style={{ flex: 1 }}>
             {currentTab === 'home' && (
               <HomeTab 
                 T={T} userName={userName} userPhone={authPhone} mainBalance={mainBalance} mainData={mainData} unitBalance={unitBalance}
@@ -583,10 +730,26 @@ export default function Index() {
                 setAutoPayEnabled={setAutoPayEnabled} 
                 setCustomAlert={setCustomAlert} 
                 savedCards={savedCards}
+                activePackage={activePackage}
+                nextPackage={nextPackage}
+                handlePackageChange={handlePackageChange}
+                serviceType={serviceType}
+                handleServiceTypeChange={handleServiceTypeChange}
               />
             )}
             {currentTab === 'settings' && (
-              <SettingsTab T={T} userName={userName} userPhone={authPhone} addNotification={addNotification} setCustomAlert={setCustomAlert} biometricsEnabled={false} setBiometricsEnabled={() => {}} appLanguage={appLanguage} setAppLanguage={setAppLanguage} setActiveAction={setActiveAction} setShowAIChat={setShowAIChat} handleLogout={async () => await supabase.auth.signOut()} />
+              <SettingsTab 
+                T={T} 
+                userName={userName} 
+                userPhone={authPhone} 
+                addNotification={addNotification} 
+                setCustomAlert={setCustomAlert} 
+                biometricsEnabled={biometricsEnabled} setBiometricsEnabled={setBiometricsEnabled} 
+                appLanguage={appLanguage} setAppLanguage={setAppLanguage} 
+                setActiveAction={setActiveAction} 
+                setShowAIChat={setShowAIChat} 
+                handleLogout={async () => await supabase.auth.signOut()} 
+                openInputDialog={setInputDialog} handleUpdateName={handleUpdateName} handleUpdatePassword={handleUpdatePassword} />
             )}
 
             {/* Bottom Navigation */}
@@ -621,6 +784,7 @@ export default function Index() {
           visible={customAlert.visible} 
           message={customAlert.message} 
           onClose={() => setCustomAlert({ visible: false, message: '' })} 
+          buttons={customAlert.buttons || []}
         />
         <AiChatModal visible={showAIChat} onClose={() => setShowAIChat(false)} chatMessages={chatMessages} chatInput={chatInput} setChatInput={setChatInput} onSendMessage={handleSendMessage} />
         <DataActionModal visible={activeAction === 'data'} onClose={() => { setActiveAction(null); setShowPayment(false); }} showPayment={showPayment} selectedDataPkg={selectedDataPkg} unitBalance={unitBalance} handleSelectPackage={handleSelectPackage} handlePaymentConfirm={handlePaymentConfirm} />

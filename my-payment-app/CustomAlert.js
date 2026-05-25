@@ -3,7 +3,7 @@ import { Dimensions, Text, TouchableOpacity, View } from 'react-native';
 
 const { width } = Dimensions.get('window');
 
-const CustomAlert = ({ visible, message, onClose }) => {
+const CustomAlert = ({ visible, message, onClose, buttons }) => {
   if (!visible) return null;
 
   return (
@@ -30,18 +30,35 @@ const CustomAlert = ({ visible, message, onClose }) => {
         elevation: 10
       }}>
         <View style={{
-          backgroundColor: message.includes('Амжилттай') ? '#10B981' : '#EF4444',
+          backgroundColor: message.toLowerCase().includes('амжилттай') ? '#10B981' : (buttons && buttons.length > 0) ? '#3B82F6' : '#EF4444',
           width: 50, height: 50, borderRadius: 25,
           justifyContent: 'center', alignItems: 'center', marginBottom: 16
         }}>
-          <Feather name={message.includes('Амжилттай') ? "check-circle" : "alert-circle"} size={28} color="#FFF" />
+          <Feather name={message.toLowerCase().includes('амжилттай') ? "check-circle" : (buttons && buttons.length > 0) ? "help-circle" : "alert-circle"} size={28} color="#FFF" />
         </View>
         <Text style={{ color: '#FFF', fontSize: 15, fontWeight: '600', textAlign: 'center', marginBottom: 24, lineHeight: 22 }}>
           {message}
         </Text>
-        <TouchableOpacity onPress={onClose} style={{ backgroundColor: '#5B21B6', paddingVertical: 14, width: '100%', borderRadius: 14, alignItems: 'center' }}>
-          <Text style={{ color: '#FFF', fontSize: 15, fontWeight: 'bold' }}>Ойлголоо</Text>
-        </TouchableOpacity>
+        {buttons && buttons.length > 0 ? (
+          <View style={{ flexDirection: 'row', width: '100%', gap: 10 }}>
+            {buttons.map((button, index) => (
+              <TouchableOpacity 
+                key={index} 
+                onPress={button.onPress} 
+                style={{ 
+                  backgroundColor: button.style === 'cancel' ? '#374151' : '#5B21B6', 
+                  paddingVertical: 14, flex: 1, borderRadius: 14, alignItems: 'center' 
+                }}
+              >
+                <Text style={{ color: '#FFF', fontSize: 15, fontWeight: 'bold' }}>{button.text}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        ) : (
+          <TouchableOpacity onPress={onClose} style={{ backgroundColor: '#5B21B6', paddingVertical: 14, width: '100%', borderRadius: 14, alignItems: 'center' }}>
+            <Text style={{ color: '#FFF', fontSize: 15, fontWeight: 'bold' }}>Ойлголоо</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );

@@ -2,7 +2,7 @@ import { Feather } from '@expo/vector-icons';
 import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { styles } from './styles';
 
-const SettingsTab = ({ T, userName, userPhone, addNotification, setCustomAlert, biometricsEnabled, setBiometricsEnabled, appLanguage, setAppLanguage, setActiveAction, setShowAIChat, handleLogout }) => {
+const SettingsTab = ({ T, userName, userPhone, addNotification, setCustomAlert, biometricsEnabled, setBiometricsEnabled, appLanguage, setAppLanguage, setActiveAction, setShowAIChat, handleLogout, openInputDialog, handleUpdateName, handleUpdatePassword }) => {
   return (
     <ScrollView showsVerticalScrollIndicator={false} style={styles.scrollArea}>
       <View style={styles.header}>
@@ -30,25 +30,58 @@ const SettingsTab = ({ T, userName, userPhone, addNotification, setCustomAlert, 
         <Feather name="edit-3" size={18} color="#4B5563" />
       </TouchableOpacity>
 
+      {/* Хэрэглэгчийн тохиргоо */}
+      <Text style={styles.sectionTitleInternal}>Хувийн мэдээлэл</Text>
+      <View style={{ backgroundColor: '#1C1C24', borderRadius: 20, marginBottom: 20, borderWidth: 1, borderColor: '#2D2D3A', overflow: 'hidden' }}>
+        <TouchableOpacity 
+          onPress={() => openInputDialog({ 
+            visible: true, 
+            title: 'Нэр солих', 
+            placeholder: 'Шинэ нэрээ оруулна уу', 
+            onConfirm: handleUpdateName
+          })}
+          style={{ flexDirection: 'row', alignItems: 'center', padding: 18, borderBottomWidth: 1, borderBottomColor: '#2D2D3A' }}
+        >
+          <View style={{ backgroundColor: 'rgba(99, 102, 241, 0.1)', padding: 10, borderRadius: 12, marginRight: 16 }}>
+            <Feather name="user" size={20} color="#A5B4FC" />
+          </View>
+          <Text style={{ color: '#FFF', flex: 1, fontSize: 15, fontWeight: '500' }}>Профайл засах</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          onPress={() => openInputDialog({ 
+            visible: true, 
+            title: 'Нууц үг солих', 
+            placeholder: 'Шинэ нууц үгээ оруулна уу', 
+            secureTextEntry: true, 
+            onConfirm: handleUpdatePassword
+          })}
+          style={{ flexDirection: 'row', alignItems: 'center', padding: 18 }}
+        >
+          <View style={{ backgroundColor: 'rgba(236, 72, 153, 0.1)', padding: 10, borderRadius: 12, marginRight: 16 }}>
+            <Feather name="key" size={20} color="#F9A8D4" />
+          </View>
+          <Text style={{ color: '#FFF', flex: 1, fontSize: 15, fontWeight: '500' }}>Нууц үг солих</Text>
+        </TouchableOpacity>
+      </View>
+
       {/* Апп тохиргоо */}
       <Text style={styles.sectionTitleInternal}>Аппликейшн</Text>
       <View style={{ backgroundColor: '#1C1C24', borderRadius: 20, marginBottom: 20, borderWidth: 1, borderColor: '#2D2D3A', overflow: 'hidden' }}>
-        <TouchableOpacity 
-          onPress={() => setBiometricsEnabled(!biometricsEnabled)}
-          style={{ flexDirection: 'row', alignItems: 'center', padding: 18, borderBottomWidth: 1, borderBottomColor: '#2D2D3A' }}
-        >
+        <View style={{ flexDirection: 'row', alignItems: 'center', padding: 18, borderBottomWidth: 1, borderBottomColor: '#2D2D3A' }}>
           <View style={{ backgroundColor: 'rgba(110, 231, 183, 0.1)', padding: 10, borderRadius: 12, marginRight: 16 }}>
             <Feather name="shield" size={20} color="#6EE7B7" />
           </View>
           <Text style={{ color: '#FFF', flex: 1, fontSize: 15, fontWeight: '500' }}>Biometric нэвтрэлт</Text>
-          <View style={{ 
-            width: 44, height: 24, borderRadius: 12, 
-            backgroundColor: biometricsEnabled ? '#10B981' : '#374151', 
-            padding: 2, justifyContent: biometricsEnabled ? 'flex-end' : 'flex-start' 
-          }}>
-            <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: '#FFF' }} />
-          </View>
-        </TouchableOpacity>
+          <TouchableOpacity 
+            onPress={() => setBiometricsEnabled(!biometricsEnabled)}
+            style={{ 
+              width: 48, height: 26, borderRadius: 13, 
+              backgroundColor: biometricsEnabled ? '#10B981' : '#374151', 
+              padding: 2, justifyContent: 'center'
+            }}>
+            <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: '#FFF', alignSelf: biometricsEnabled ? 'flex-end' : 'flex-start' }} />
+          </TouchableOpacity>
+        </View>
 
         <TouchableOpacity 
           onPress={() => setAppLanguage(appLanguage === 'MN' ? 'EN' : 'MN')}

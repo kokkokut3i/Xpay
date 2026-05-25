@@ -25,6 +25,14 @@ const OverviewTab = ({ T, mainBalance, mainData, unitBalance, notificationList, 
           <View>
             <Text style={styles.overviewLabel}>{T.overview.totalData}</Text>
             <Text style={styles.overviewAmount}>{mainData.toFixed(1)} GB</Text>
+          </View>
+          <View style={{ backgroundColor: 'rgba(59, 130, 246, 0.1)', padding: 10, borderRadius: 12 }}>
+            <Feather name="activity" size={20} color="#3B82F6" />
+          </View>
+        </View>
+        <Text style={styles.overviewCompareText}>{T.overview.compare} <Text style={{color: '#10B981'}}>+2.4 GB</Text> {T.overview.moreThan}</Text>
+      </TouchableOpacity>
+
       {/* Дансны бодит үлдэгдлүүд */}
       <View style={{ flexDirection: 'row', paddingHorizontal: 4, marginBottom: 20 }}>
         <View style={{ flex: 1, backgroundColor: '#1C1C24', padding: 16, borderRadius: 20, marginRight: 8, borderWidth: 1, borderColor: '#2D2D3A' }}>
@@ -69,14 +77,6 @@ const OverviewTab = ({ T, mainBalance, mainData, unitBalance, notificationList, 
           <Text style={{ color: '#6B7280', textAlign: 'center', marginTop: 10 }}>Гүйлгээний түүх одоогоор хоосон байна.</Text>
         )}
       </View>
-
-          </View>
-          <View style={{ backgroundColor: 'rgba(59, 130, 246, 0.1)', padding: 10, borderRadius: 12 }}>
-            <Feather name="activity" size={20} color="#3B82F6" />
-          </View>
-        </View>
-        <Text style={styles.overviewCompareText}>{T.overview.compare} <Text style={{color: '#10B981'}}>+2.4 GB</Text> {T.overview.moreThan}</Text>
-      </TouchableOpacity>
 
       {/* Шуурхай үйлдлүүдийн хэсэг */}
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 20 }}>

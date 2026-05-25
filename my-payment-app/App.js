@@ -4,7 +4,6 @@ import * as SecureStore from 'expo-secure-store';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Dimensions,
   Modal,
   ScrollView,
@@ -25,6 +24,7 @@ import BillingTab from './BillingTab';
 import CustomAlert from './CustomAlert';
 import DataActionModal from './DataActionModal';
 import HomeTab from './HomeTab';
+import InputDialog from './InputDialog';
 import MoreActionModal from './MoreActionModal';
 import OverviewTab from './OverviewTab';
 import SearchModal from './SearchModal';
@@ -66,6 +66,16 @@ export default function App() {
   const [selectedBank, setSelectedBank] = useState(null);
   const [cardNumber, setCardNumber] = useState('');
   const [savedCards, setSavedCards] = useState([]);
+  const [serviceType, setServiceType] = useState('postpaid'); // 'prepaid' or 'postpaid'
+
+  // Багцын мэдээлэл
+  const availablePackages = [
+    { id: 'standard', name: 'Стандарт багц', price: 25000, desc: 'Үндсэн хэрэглээнд' },
+    { id: 'unlimited', name: 'Хязгааргүй дата', price: 35000, desc: 'Дата хэрэглээ өндөр хүмүүст' },
+    { id: 'premium', name: 'Премиум багц', price: 55000, desc: 'Бүх үйлчилгээг багтаасан' },
+  ];
+  const [activePackage, setActivePackage] = useState(availablePackages[0]);
+  const [nextPackage, setNextPackage] = useState(null);
 
   // Хайлт болон Мэдэгдлийн төлөв
   const [isSearching, setIsSearching] = useState(false);
@@ -82,6 +92,13 @@ export default function App() {
     { id: 1, text: 'Сайн байна уу! 🤖 Би таны ухаалаг туслах байна. Таны дата эсвэл нэгж дууссан уу? Би танд тохирох шилдэг багцыг санал болгож чадна.', sender: 'ai', time: 'Яг одоо: Таны дата 80%-тай байна.' }
   ]);
   const [chatInput, setChatInput] = useState('');
+  const [inputDialog, setInputDialog] = useState({
+    visible: false,
+    title: '',
+    placeholder: '',
+    secureTextEntry: false,
+    onConfirm: (text) => {},
+  });
 
   const addNotification = (title, desc, icon = 'info', color = '#3B82F6') => {
     const newNote = {
@@ -293,32 +310,29 @@ export default function App() {
   // --- ШИЛЖҮҮЛЭГ ХИЙХ ФУНКЦ ---
   const handleTransfer = async ({ method, target, type, value }) => {
     if (!userId) return false;
-    let updateData = {};
-    const val = parseInt(value);
-
+    
     try {
-      if (type === 'money') {
-        if (mainBalance < val) throw new Error("Дансны үлдэгдэл хүрэлцэхгүй байна.");
-        updateData = { balance: mainBalance - val };
-      } else if (type === 'unit') {
-        if (unitBalance < val) throw new Error("Нэгж хүрэлцэхгүй байна.");
-        updateData = { unit_balance: unitBalance - val };
-      } else if (type === 'data') {
-        // value нь { gb, price } объект байна
-        if (mainBalance < value.price) throw new Error("Дата багц авахад үлдэгдэл хүрэлцэхгүй байна.");
-        updateData = { balance: mainBalance - value.price };
+      if (method !== 'phone') {
+        throw new Error("Одоогоор зөвхөн утасны дугаараар шилжүүлэх боломжтой.");
       }
 
-      const { error } = await supabase.from('profiles').update(updateData).eq('id', userId);
+      const { data: result, error } = await supabase.rpc('execute_transfer', {
+        sender_id: userId,
+        recipient_phone: target,
+        transfer_type: type,
+        transfer_value: type === 'data' ? value : parseInt(value)
+      });
+
       if (error) throw error;
 
-      // State шинэчлэх
-      if (type === 'money' || type === 'data') setMainBalance(updateData.balance);
-      if (type === 'unit') setUnitBalance(updateData.unit_balance);
+      if (result !== 'Амжилттай') {
+        // SQL функцээс буцаасан алдааг харуулах
+        throw new Error(result.replace('Алдаа: ', ''));
+      }
 
       addNotification(
         'Шилжүүлэг амжилттай', 
-        `${target} руу ${type === 'data' ? value.name : val + (type === 'money' ? '₮' : ' нэгж')} шилжүүллээ.`, 
+        `${target} руу ${type === 'data' ? value.name : parseInt(value) + (type === 'money' ? '₮' : ' нэгж')} шилжүүллээ.`, 
         'send', '#10B981'
       );
       setCustomAlert({ visible: true, message: 'Шилжүүлэг амжилттай хийгдлээ.' });
@@ -327,6 +341,50 @@ export default function App() {
       setCustomAlert({ visible: true, message: err.message });
       return false;
     }
+  };
+
+  // --- ҮЙЛЧИЛГЭЭНИЙ ТӨРӨЛ СОЛИХ ---
+  const handleServiceTypeChange = async (newType) => {
+    if (!userId || serviceType === newType) return;
+
+    setServiceType(newType); // Optimistic update
+    const { error } = await supabase
+        .from('profiles')
+        .update({ service_type: newType })
+        .eq('id', userId);
+
+    if (error) {
+        setCustomAlert({ visible: true, message: 'Үйлчилгээний төрөл солиход алдаа гарлаа.' });
+        setServiceType(serviceType); // Revert on error
+    }
+  };
+  // --- БАГЦ СОЛИХ ФУНКЦ ---
+  const handlePackageChange = async (selectedPkg) => {
+    if (!userId || !isBillPaid) return;
+
+    setCustomAlert({
+      visible: true,
+      message: `Та дараа сараас идэвхжих багцаа "${selectedPkg.name}" болгохдоо итгэлтэй байна уу?`,
+      buttons: [
+        {
+          text: "Цуцлах",
+          style: "cancel",
+          onPress: () => setCustomAlert({ visible: false, message: '' })
+        },
+        {
+          text: "Тийм",
+          onPress: async () => {
+            const { error } = await supabase.from('profiles').update({ next_package: selectedPkg.id }).eq('id', userId);
+            if (error) {
+              setCustomAlert({ visible: true, message: 'Багц солих үед алдаа гарлаа.', buttons: [] });
+            } else {
+              setNextPackage(selectedPkg);
+              setCustomAlert({ visible: true, message: `Амжилттай! Таны багц дараа сараас ${selectedPkg.name} болон солигдоно.`, buttons: [] });
+            }
+          }
+        }
+      ]
+    });
   };
 
   // --- AI CHAT ЛОГИК ---
@@ -355,6 +413,41 @@ export default function App() {
       const botMsg = { id: Date.now() + 1, text: botResponse, sender: 'ai' };
       setChatMessages(prev => [...prev, botMsg]);
     }, 1000);
+  };
+
+  // --- НЭР СОЛИХ ФУНКЦ ---
+  const handleUpdateName = async (newName) => {
+    if (!userId || !newName || newName.trim() === '') return;
+    setInputDialog({ ...inputDialog, visible: false });
+
+    // Auth user update
+    const { data: { user }, error: userError } = await supabase.auth.updateUser({ data: { full_name: newName } });
+    // Profile table update
+    const { error: profileError } = await supabase.from('profiles').update({ full_name: newName }).eq('id', userId);
+
+    if (userError || profileError) {
+      setCustomAlert({ visible: true, message: 'Нэр солих үед алдаа гарлаа.' });
+    } else {
+      setUserName(newName);
+      addNotification('Амжилттай', 'Таны нэр амжилттай солигдлоо.', 'check-circle', '#10B981');
+    }
+  };
+
+  // --- НУУЦ ҮГ СОЛИХ ФУНКЦ ---
+  const handleUpdatePassword = async (newPassword) => {
+    if (!newPassword || newPassword.length < 6) {
+      setInputDialog({ ...inputDialog, visible: false });
+      setCustomAlert({ visible: true, message: 'Нууц үг 6-аас доошгүй тэмдэгттэй байх ёстой.' });
+      return;
+    }
+    setInputDialog({ ...inputDialog, visible: false });
+
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) {
+      setCustomAlert({ visible: true, message: 'Нууц үг солих үед алдаа гарлаа.' });
+    } else {
+      addNotification('Амжилттай', 'Нууц үг амжилттай солигдлоо.', 'check-circle', '#10B981');
+    }
   };
 
   // --- НЭВТРЭХ / БҮРТГҮҮЛЭХ ФУНКЦ ---
@@ -386,17 +479,26 @@ export default function App() {
           // Биометрик асуух
           if (!biometricsEnabled) {
             const hasHardware = await LocalAuthentication.hasHardwareAsync();
-            if (hasHardware) {
-              Alert.alert('Biometric', 'Биометрик ашиглах уу?', [
-                { text: 'Үгүй' },
-                { text: 'Тийм', onPress: async () => {
-                  await SecureStore.setItemAsync('user_phone', authPhone);
-                  await SecureStore.setItemAsync('user_pass', authPass);
-                  await supabase.from('profiles').update({ biometrics_enabled: true }).eq('id', data.user.id);
-                  setBiometricsEnabled(true);
-                }}
-              ]);
-            }
+            const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+            if (hasHardware && isEnrolled) {
+              setCustomAlert({
+                visible: true,
+                message: 'Та дараагийн удаа хурууны хээ эсвэл нүүр танигчаар нэвтрэх үү?',
+                buttons: [
+                  { text: 'Үгүй', style: 'cancel', onPress: () => setCustomAlert({ visible: false, message: '' }) },
+                  {
+                    text: 'Асаах',
+                    onPress: async () => {
+                      await SecureStore.setItemAsync('user_phone', authPhone);
+                      await SecureStore.setItemAsync('user_pass', authPass);
+                      await supabase.from('profiles').update({ biometrics_enabled: true }).eq('id', data.user.id);
+                      setBiometricsEnabled(true);
+                      setCustomAlert({ visible: false, message: '' });
+                    },
+                  },
+                ],
+              });
+            } 
           }
         }
       } else {
@@ -432,7 +534,7 @@ export default function App() {
   const fetchUserProfile = async (userId) => {
     const { data, error } = await supabase
       .from('profiles')
-      .select('full_name, phone, balance, data_gb, unit_balance, is_bill_paid, last_payment_date, saved_cards')
+      .select('full_name, phone, balance, data_gb, unit_balance, is_bill_paid, last_payment_date, saved_cards, active_package, next_package, service_type')
       .eq('id', userId)
       .maybeSingle(); // single() биш maybeSingle() ашиглах нь алдаанаас сэргийлнэ
 
@@ -448,9 +550,40 @@ export default function App() {
       setMainBalance(Number(data.balance) || 0);
       setMainData(Number(data.data_gb) || 0);
       setUnitBalance(Number(data.unit_balance) || 0);
-      setIsBillPaid(data.is_bill_paid || false);
-      setLastPaymentDate(data.last_payment_date || null);
       setSavedCards(data.saved_cards || []);
+      setServiceType(data.service_type || 'postpaid');
+
+      // Идэвхтэй болон дараагийн багцыг тохируулах
+      const currentPkg = availablePackages.find(p => p.id === data.active_package) || availablePackages[0];
+      const upcomingPkg = availablePackages.find(p => p.id === data.next_package);
+      setActivePackage(currentPkg);
+      setNextPackage(upcomingPkg || null);
+
+      // Төлбөрийн төлөвийг сар шалгаж шинэчлэх
+      const lastPaid = data.last_payment_date ? new Date(data.last_payment_date) : null;
+      const now = new Date();
+      let updates = {};
+      let needsUpdate = false;
+
+      if (lastPaid && lastPaid.getMonth() === now.getMonth() && lastPaid.getFullYear() === now.getFullYear()) {
+        // Энэ сард төлсөн бол төлсөн төлөвт үлдээх
+        setIsBillPaid(true);
+        setLastPaymentDate(data.last_payment_date);
+      } else {
+        // Сар солигдсон бол төлбөрийн төлөвийг шинэчлэх
+        setIsBillPaid(false);
+        setLastPaymentDate(null);
+        updates = { is_bill_paid: false, last_payment_date: null };
+        needsUpdate = true;
+
+        // Хэрэв дараа сарын багц сонгосон байвал түүнийг идэвхжүүлэх
+        if (upcomingPkg) {
+          setActivePackage(upcomingPkg);
+          setNextPackage(null);
+          updates = { ...updates, active_package: upcomingPkg.id, next_package: null };
+        }
+        if (needsUpdate) await supabase.from('profiles').update(updates).eq('id', userId);
+      }
     } else {
       console.log("No profile found for user:", userId);
     }
@@ -490,6 +623,7 @@ export default function App() {
         setUnitBalance(0);
         setIsBillPaid(false);
         setLastPaymentDate(null);
+        setNotificationList([]); // Нэвтрэлт дуусах үед мэдэгдлийг цэвэрлэх
       }
     });
 
@@ -519,6 +653,7 @@ export default function App() {
             setIsBillPaid(payload.new.is_bill_paid);
             setLastPaymentDate(payload.new.last_payment_date);
             setSavedCards(payload.new.saved_cards || []);
+            if (payload.new.service_type) setServiceType(payload.new.service_type);
           }
         }
       )
@@ -591,7 +726,7 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="light-content" backgroundColor="#0F0F14" />
 
       {/* Toast Notification - Дэлгэцийн дээд хэсэгт харагдах түр зуурын мэдэгдэл */}
@@ -654,12 +789,18 @@ export default function App() {
                 setAutoPayEnabled={setAutoPayEnabled} 
                 setCustomAlert={setCustomAlert} 
                 savedCards={savedCards}
+                activePackage={activePackage}
+                nextPackage={nextPackage}
+                handlePackageChange={handlePackageChange}
+                serviceType={serviceType}
+                handleServiceTypeChange={handleServiceTypeChange}
               />
             )}
             {currentTab === 'settings' && (
               <SettingsTab 
                 T={T} userName={userName} userPhone={authPhone} addNotification={addNotification} setCustomAlert={setCustomAlert} biometricsEnabled={biometricsEnabled} setBiometricsEnabled={setBiometricsEnabled}
                 appLanguage={appLanguage} setAppLanguage={setAppLanguage} setActiveAction={setActiveAction} setShowAIChat={setShowAIChat} handleLogout={handleLogout}
+                openInputDialog={setInputDialog} handleUpdateName={handleUpdateName} handleUpdatePassword={handleUpdatePassword}
               />
             )}
 
@@ -697,6 +838,15 @@ export default function App() {
           visible={customAlert.visible} 
           message={customAlert.message} 
           onClose={() => setCustomAlert({ visible: false, message: '' })} 
+          buttons={customAlert.buttons}
+        />
+        <InputDialog
+          visible={inputDialog.visible}
+          title={inputDialog.title}
+          placeholder={inputDialog.placeholder}
+          secureTextEntry={inputDialog.secureTextEntry}
+          onCancel={() => setInputDialog({ ...inputDialog, visible: false })}
+          onConfirm={inputDialog.onConfirm}
         />
 
         {/* Салгасан Modal компонентуудыг ашиглах */}

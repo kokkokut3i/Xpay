@@ -1,16 +1,31 @@
 import { Feather } from '@expo/vector-icons';
-import { useState } from 'react';
+import React from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { styles } from './styles';
 
-const BillingTab = ({ T, isBillPaid, lastPaymentDate, setActiveAction, handlePayBill, autoPayEnabled, setAutoPayEnabled, setCustomAlert, savedCards }) => {
-  const [serviceType, setServiceType] = useState('postpaid'); // 'prepaid' or 'postpaid'
-
+const BillingTab = ({ 
+  T, 
+  isBillPaid, 
+  lastPaymentDate, 
+  setActiveAction, 
+  handlePayBill, 
+  autoPayEnabled, 
+  setAutoPayEnabled, 
+  setCustomAlert, 
+  savedCards,
+  activePackage,
+  nextPackage,
+  handlePackageChange,
+  serviceType,
+  handleServiceTypeChange
+}) => {
   const postpaidPackages = [
     { id: 'M', name: 'M-Plan', price: 19000, data: '15GB', talk: '300min', benefits: ['Social дата хязгааргүй', 'Мессеж хязгааргүй'] },
     { id: 'L', name: 'L-Plan', price: 29000, data: '30GB', talk: '500min', benefits: ['Бүх дата хязгааргүй (хурд хязгаартай)', 'Шөнийн дата хязгааргүй'] },
     { id: 'XL', name: 'XL-Plan', price: 49000, data: '100GB', talk: '1000min', benefits: ['Роуминг дата 1GB', 'IPTV эрх багтсан', 'VIP үйлчилгээ'] },
   ];
+
+  const billAmount = activePackage?.price || 24500;
 
   return (
     <ScrollView showsVerticalScrollIndicator={false} style={styles.scrollArea}>
@@ -29,18 +44,17 @@ const BillingTab = ({ T, isBillPaid, lastPaymentDate, setActiveAction, handlePay
       <View style={localStyles.tabContainer}>
         <TouchableOpacity 
           style={[localStyles.tabButton, serviceType === 'prepaid' && localStyles.activeTab]} 
-          onPress={() => setServiceType('prepaid')}
+          onPress={() => handleServiceTypeChange('prepaid')} // Дотоод state-ийн оронд prop ашиглах
         >
           <Text style={[localStyles.tabText, serviceType === 'prepaid' && localStyles.activeTabText]}>{T.billing.prepaid}</Text>
         </TouchableOpacity>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[localStyles.tabButton, serviceType === 'postpaid' && localStyles.activeTab]} 
-          onPress={() => setServiceType('postpaid')}
+          onPress={() => handleServiceTypeChange('postpaid')} // Дотоод state-ийн оронд prop ашиглах
         >
           <Text style={[localStyles.tabText, serviceType === 'postpaid' && localStyles.activeTabText]}>{T.billing.postpaid}</Text>
         </TouchableOpacity>
       </View>
-
       {serviceType === 'postpaid' ? (
         <>
       {/* Төлбөрийн үндсэн карт */}
@@ -53,7 +67,7 @@ const BillingTab = ({ T, isBillPaid, lastPaymentDate, setActiveAction, handlePay
                 </Text>
             </View>
         </View>
-        <Text style={{ color: '#FFF', fontSize: 32, fontWeight: 'bold', marginTop: 8 }}>{isBillPaid ? '₮0' : '₮24,500'}</Text>
+        <Text style={{ color: '#FFF', fontSize: 32, fontWeight: 'bold', marginTop: 8 }}>{isBillPaid ? '₮0' : `₮${billAmount.toLocaleString()}`}</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
             <Feather name="calendar" size={12} color={isBillPaid ? '#D8B4FE' : '#FCA5A5'} />
             <Text style={{ color: isBillPaid ? '#D8B4FE' : '#FCA5A5', fontSize: 12, marginLeft: 6, fontWeight: '500' }}>
@@ -80,51 +94,58 @@ const BillingTab = ({ T, isBillPaid, lastPaymentDate, setActiveAction, handlePay
         {!isBillPaid && (
           <TouchableOpacity 
               style={{ backgroundColor: '#FFF', borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginTop: 16 }}
-              onPress={() => handlePayBill(24500)}
+              onPress={() => handlePayBill(billAmount)}
           >
             <Text style={{ color: '#1E1B4B', fontWeight: 'bold', fontSize: 15 }}>{T.billing.payMonthly}</Text>
           </TouchableOpacity>
         )}
       </View>
 
-      {/* Дараа төлбөрт багцууд */}
-      <Text style={styles.sectionTitleInternal}>{T.billing.availablePackages}</Text>
-      {postpaidPackages.map((pkg) => (
-        <View key={pkg.id} style={localStyles.packageCard}>
-          <View style={localStyles.packageHeader}>
-            <View>
-              <Text style={localStyles.packageName}>{pkg.name}</Text>
-              <Text style={localStyles.packagePrice}>₮{pkg.price.toLocaleString()} / {T.billing.month}</Text>
-            </View>
-            <TouchableOpacity 
-              style={localStyles.changeButton}
-              onPress={() => setCustomAlert({ visible: true, message: `${pkg.name} багц руу шилжих хүсэлт хүлээн авлаа.` })}
-            >
-              <Text style={localStyles.changeButtonText}>Шилжих</Text>
-            </TouchableOpacity>
-          </View>
-          
-          <View style={localStyles.packageSpecs}>
-            <View style={localStyles.specItem}>
-              <Feather name="wifi" size={14} color="#10B981" />
-              <Text style={localStyles.specText}>{pkg.data}</Text>
-            </View>
-            <View style={localStyles.specItem}>
-              <Feather name="phone" size={14} color="#3B82F6" />
-              <Text style={localStyles.specText}>{pkg.talk}</Text>
-            </View>
-          </View>
-
-          <View style={localStyles.benefitsList}>
-            {pkg.benefits.map((benefit, i) => (
-              <View key={i} style={localStyles.benefitItem}>
-                <Feather name="check-circle" size={12} color="#10B981" />
-                <Text style={localStyles.benefitText}>{benefit}</Text>
+      {/* Багц солих хэсэг - Зөвхөн төлбөр төлсөн үед харагдана */}
+      {isBillPaid && (
+        <View style={{ marginTop: 24 }}>
+          <Text style={styles.sectionTitleInternal}>{T.billing.availablePackages}</Text>
+          {postpaidPackages.map((pkg) => (
+            <View key={pkg.id} style={localStyles.packageCard}>
+              <View style={localStyles.packageHeader}>
+                <View>
+                  <Text style={localStyles.packageName}>{pkg.name}</Text>
+                  <Text style={localStyles.packagePrice}>₮{pkg.price.toLocaleString()} / {T.billing.month}</Text>
+                </View>
+                <TouchableOpacity 
+                  style={[localStyles.changeButton, (activePackage?.id === pkg.id || nextPackage?.id === pkg.id) && {backgroundColor: '#374151'}]}
+                  onPress={() => handlePackageChange(pkg)}
+                  disabled={activePackage?.id === pkg.id || nextPackage?.id === pkg.id}
+                >
+                  <Text style={[localStyles.changeButtonText, (activePackage?.id === pkg.id || nextPackage?.id === pkg.id) && {color: '#9CA3AF'}]}>
+                    {activePackage?.id === pkg.id ? 'Идэвхтэй' : nextPackage?.id === pkg.id ? 'Сонгогдсон' : 'Шилжих'}
+                  </Text>
+                </TouchableOpacity>
               </View>
-            ))}
-          </View>
+              
+              <View style={localStyles.packageSpecs}>
+                <View style={localStyles.specItem}>
+                  <Feather name="wifi" size={14} color="#10B981" />
+                  <Text style={localStyles.specText}>{pkg.data}</Text>
+                </View>
+                <View style={localStyles.specItem}>
+                  <Feather name="phone" size={14} color="#3B82F6" />
+                  <Text style={localStyles.specText}>{pkg.talk}</Text>
+                </View>
+              </View>
+    
+              <View style={localStyles.benefitsList}>
+                {pkg.benefits.map((benefit, i) => (
+                  <View key={i} style={localStyles.benefitItem}>
+                    <Feather name="check-circle" size={12} color="#10B981" />
+                    <Text style={localStyles.benefitText}>{benefit}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          ))}
         </View>
-      ))}
+      )}
       </>
       ) : (
         <View style={localStyles.prepaidContainer}>
@@ -177,9 +198,9 @@ const BillingTab = ({ T, isBillPaid, lastPaymentDate, setActiveAction, handlePay
           style={{ 
             width: 48, height: 26, borderRadius: 13, 
             backgroundColor: autoPayEnabled ? '#10B981' : '#374151', 
-            padding: 2, justifyContent: 'center', alignItems: autoPayEnabled ? 'flex-end' : 'flex-start' 
+            padding: 2, justifyContent: 'center'
           }}>
-          <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: '#FFF' }} />
+          <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: '#FFF', alignSelf: autoPayEnabled ? 'flex-end' : 'flex-start' }} />
         </TouchableOpacity>
       </View>
 
@@ -327,7 +348,25 @@ const localStyles = StyleSheet.create({
   topupButtonText: {
     color: '#FFF',
     fontWeight: 'bold',
-  }
+  },
+  // Багц солих
+  packageOption: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#1C1C24',
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 10,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  selectedPackage: {
+    borderColor: '#7C3AED',
+  },
+  packageDesc: { color: '#9CA3AF', fontSize: 12, marginTop: 4 },
+  nextPackageInfo: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(59, 130, 246, 0.1)', padding: 14, borderRadius: 16, marginBottom: 16, borderWidth: 1, borderColor: 'rgba(59, 130, 246, 0.3)' },
+  nextPackageText: { color: '#FFF', marginLeft: 10, fontWeight: '600' },
 });
 
 export default BillingTab;

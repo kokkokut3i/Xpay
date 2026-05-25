@@ -1,16 +1,17 @@
 import { Feather } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
-    ActivityIndicator,
-    Dimensions,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Dimensions,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
+import { supabase } from './supabase';
 
 const { height } = Dimensions.get('window');
 
@@ -39,6 +40,9 @@ const TransferModal: React.FC<TransferModalProps> = ({
   const [type, setType] = useState('money'); // 'money', 'unit', 'data'
   const [amount, setAmount] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [recipientInfo, setRecipientInfo] = useState<{ name: string } | null>(null);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [verifyError, setVerifyError] = useState('');
 
   const dataPackages = [
     { id: 'd1', gb: 1, price: 1000, name: '1GB Багц' },
@@ -54,7 +58,29 @@ const TransferModal: React.FC<TransferModalProps> = ({
     setTarget('');
     setType('money');
     setAmount('');
+    setRecipientInfo(null);
+    setVerifyError('');
+    setIsVerifying(false);
     onClose();
+  };
+
+  const handleVerifyRecipient = async () => {
+    if (target.length !== 8) {
+      setVerifyError("Утасны дугаар 8 оронтой байх ёстой.");
+      return;
+    }
+    setIsVerifying(true);
+    setVerifyError('');
+    setRecipientInfo(null);
+
+    const { data, error } = await supabase.rpc('get_user_by_phone', { phone_number: target }).single() as { data: { id: string, full_name: string } | null, error: any };
+
+    if (error || !data || !(data as any).full_name) {
+      setVerifyError("Уучлаарай, энэ дугаар бүртгэлгүй байна.");
+    } else {
+      setRecipientInfo({ name: (data as any).full_name });
+    }
+    setIsVerifying(false);
   };
 
   const handleConfirm = async (dataPkg: any = null) => {
@@ -117,11 +143,34 @@ const TransferModal: React.FC<TransferModalProps> = ({
                     keyboardType="numeric"
                     value={target}
                     onChangeText={setTarget}
+                    maxLength={method === 'phone' ? 8 : undefined}
                   />
-                  <TouchableOpacity onPress={() => setStep(3)} disabled={target.length < 5} style={[localStyles.mainBtn, target.length < 5 && { opacity: 0.5 }]}>
-                    <Text style={localStyles.btnText}>Үргэлжлүүлэх</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => setStep(1)} style={localStyles.backBtn}><Text style={{ color: '#9CA3AF' }}>Буцах</Text></TouchableOpacity>
+                  {isVerifying ? (
+                    <ActivityIndicator color="#7C3AED" style={{ marginVertical: 16 }} />
+                  ) : recipientInfo ? (
+                    <View>
+                      <View style={localStyles.recipientInfoBox}>
+                        <Feather name="user-check" size={18} color="#10B981" />
+                        <Text style={localStyles.recipientName}>Хүлээн авагч: {recipientInfo.name}</Text>
+                      </View>
+                      <TouchableOpacity onPress={() => setStep(3)} style={localStyles.mainBtn}>
+                        <Text style={localStyles.btnText}>Үргэлжлүүлэх</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <TouchableOpacity onPress={handleVerifyRecipient} disabled={target.length !== 8} style={[localStyles.mainBtn, target.length !== 8 && { opacity: 0.5 }]}>
+                      <Text style={localStyles.btnText}>Шалгах</Text>
+                    </TouchableOpacity>
+                  )}
+                  {verifyError && <Text style={localStyles.errorText}>{verifyError}</Text>}
+                  <TouchableOpacity 
+                    onPress={() => { 
+                      setStep(1); 
+                      setRecipientInfo(null); 
+                      setVerifyError('');
+                    }} 
+                    style={localStyles.backBtn}
+                  ><Text style={{ color: '#9CA3AF' }}>Буцах</Text></TouchableOpacity>
                 </View>
               )}
 
@@ -194,7 +243,10 @@ const localStyles = StyleSheet.create({
   activeChip: { backgroundColor: '#7C3AED' },
   pkgItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#1C1C24', padding: 16, borderRadius: 16, marginBottom: 10, borderWidth: 1, borderColor: '#2D2D3A' },
   pkgName: { color: '#FFF', fontWeight: 'bold' },
-  pkgPrice: { color: '#9CA3AF', fontSize: 12 }
+  pkgPrice: { color: '#9CA3AF', fontSize: 12 },
+  recipientInfoBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(16, 185, 129, 0.1)', padding: 14, borderRadius: 16, marginBottom: 16, borderWidth: 1, borderColor: 'rgba(16, 185, 129, 0.3)' },
+  recipientName: { color: '#FFF', marginLeft: 10, fontWeight: '600' },
+  errorText: { color: '#EF4444', textAlign: 'center', marginTop: 12 }
 });
 
 export default TransferModal;
