@@ -1,6 +1,7 @@
 import { Feather } from '@expo/vector-icons';
-import { useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
+  ActivityIndicator,
   Animated,
   Keyboard,
   KeyboardAvoidingView,
@@ -9,7 +10,7 @@ import {
   TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
-  View
+  View,
 } from 'react-native';
 import { styles } from './styles';
 
@@ -23,11 +24,14 @@ const AuthScreen = ({
   setAuthPass, 
   authMode, 
   setAuthMode, 
-  handleAuth 
+  handleAuth,
+  isProcessing, // Шинээр нэмсэн
+  authError, // Шинээр нэмсэн
 }) => {
   // Анимацийн утгуудыг тохируулах
   const blob1Anim = useRef(new Animated.Value(0)).current;
   const blob2Anim = useRef(new Animated.Value(0)).current;
+  const errorAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     // Бөмбөлөг 1-ийн хөдөлгөөн (Loop)
@@ -54,6 +58,17 @@ const AuthScreen = ({
     startBlob2();
   }, []);
 
+  useEffect(() => {
+    if (authError) {
+      Animated.sequence([
+        Animated.timing(errorAnim, { toValue: 10, duration: 50, useNativeDriver: true }),
+        Animated.timing(errorAnim, { toValue: -10, duration: 50, useNativeDriver: true }),
+        Animated.timing(errorAnim, { toValue: 10, duration: 50, useNativeDriver: true }),
+        Animated.timing(errorAnim, { toValue: 0, duration: 50, useNativeDriver: true }),
+      ]).start();
+    }
+  }, [authError]);
+
   // Interpolation ашиглан байршлыг тодорхойлох
   const blob1Style = {
     transform: [
@@ -69,12 +84,18 @@ const AuthScreen = ({
     ],
   };
 
+  const toggleMode = () => {
+    setAuthMode(authMode === 'login' ? 'register' : 'login');
+    setAuthName('');
+    setAuthPass('');
+  };
+
   return (
     <KeyboardAvoidingView 
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={{ flex: 1, backgroundColor: '#0F0F14' }}
     >
-      {/* Хөдөлгөөнт бөмбөлгүүд */}
+      {/* Хөдөлгөөнт бөмбөлгүүд - Таны санаанаас авсан */}
       <Animated.View style={[styles.bgBlob1, blob1Style]} />
       <Animated.View style={[styles.bgBlob2, blob2Style]} />
 
@@ -84,17 +105,17 @@ const AuthScreen = ({
             <View style={styles.headerLogo}>
               <Text style={styles.headerLogoText}>X</Text>
             </View>
-            <Text style={{ color: '#FFF', fontSize: 28, fontWeight: 'bold', marginTop: 16 }}>XPAY</Text>
-            <Text style={{ color: '#9CA3AF', fontSize: 14, marginTop: 8 }}>{authMode === 'login' ? T.auth.login : T.auth.register}</Text>
+            <Text style={styles.appName}>{T.auth.welcome}</Text>
+            <Text style={styles.subGreeting}>{authMode === 'login' ? T.auth.loginSubtitle : T.auth.registerSubtitle}</Text>
           </View>
 
           <View style={{ gap: 16 }}>
             {authMode === 'register' && (
-              <View style={{ backgroundColor: '#1C1C24', borderRadius: 16, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, borderWidth: 1, borderColor: '#2D2D3A' }}>
-                <Feather name="user" size={20} color="#6B7280" />
+              <View style={localStyles.inputGroup}>
+                <Feather name="user" size={20} color="#6B7280" style={localStyles.inputIcon} />
                 <TextInput
-                  style={{ flex: 1, padding: 16, color: '#FFF' }}
-                  placeholder={T.auth.name}
+                  style={localStyles.input}
+                  placeholder={T.auth.namePlaceholder}
                   placeholderTextColor="#6B7280"
                   value={authName}
                   onChangeText={setAuthName}
@@ -102,24 +123,24 @@ const AuthScreen = ({
               </View>
             )}
 
-            <View style={{ backgroundColor: '#1C1C24', borderRadius: 16, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, borderWidth: 1, borderColor: '#2D2D3A' }}>
-              <Feather name="phone" size={20} color="#6B7280" />
+            <View style={localStyles.inputGroup}>
+              <Feather name="phone" size={20} color="#6B7280" style={localStyles.inputIcon} />
               <TextInput
-                style={{ flex: 1, padding: 16, color: '#FFF' }}
-                placeholder={T.auth.phone}
+                style={localStyles.input}
+                placeholder={T.auth.phonePlaceholder}
                 placeholderTextColor="#6B7280"
-                keyboardType="numeric"
+                keyboardType="number-pad"
                 value={authPhone}
                 onChangeText={setAuthPhone}
                 maxLength={8}
               />
             </View>
 
-            <View style={{ backgroundColor: '#1C1C24', borderRadius: 16, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, borderWidth: 1, borderColor: '#2D2D3A' }}>
-              <Feather name="lock" size={20} color="#6B7280" />
+            <View style={localStyles.inputGroup}>
+              <Feather name="lock" size={20} color="#6B7280" style={localStyles.inputIcon} />
               <TextInput
-                style={{ flex: 1, padding: 16, color: '#FFF' }}
-                placeholder={T.auth.pass}
+                style={localStyles.input}
+                placeholder={T.auth.passPlaceholder}
                 placeholderTextColor="#6B7280"
                 secureTextEntry
                 value={authPass}
@@ -127,14 +148,26 @@ const AuthScreen = ({
               />
             </View>
 
-            <TouchableOpacity onPress={handleAuth} style={{ backgroundColor: '#7C3AED', padding: 18, borderRadius: 16, alignItems: 'center', marginTop: 10, shadowColor: '#7C3AED', shadowOpacity: 0.3, shadowRadius: 10, elevation: 5 }}>
-              <Text style={{ color: '#FFF', fontSize: 16, fontWeight: 'bold' }}>{authMode === 'login' ? T.auth.loginBtn : T.auth.registerBtn}</Text>
+            {authError && (
+              <Animated.View style={{ transform: [{ translateX: errorAnim }] }}>
+                <Text style={localStyles.errorText}>{authError}</Text>
+              </Animated.View>
+            )}
+
+            <TouchableOpacity onPress={handleAuth} disabled={isProcessing} style={[localStyles.authButton, isProcessing && { opacity: 0.7 }]}>
+              {isProcessing ? (
+                <ActivityIndicator color="#FFF" />
+              ) : (
+                <Text style={localStyles.authButtonText}>{authMode === 'login' ? T.auth.loginBtn : T.auth.registerBtn}</Text>
+              )}
             </TouchableOpacity>
 
-            <TouchableOpacity onPress={() => setAuthMode(authMode === 'login' ? 'register' : 'login')} style={{ alignItems: 'center', marginTop: 10 }}>
-              <Text style={{ color: '#9CA3AF' }}>
-                {authMode === 'login' ? T.auth.newUser : T.auth.hasAccount}
-                <Text style={{ color: '#7C3AED', fontWeight: 'bold' }}>{authMode === 'login' ? T.auth.registerBtn : T.auth.loginBtn}</Text>
+            <TouchableOpacity onPress={toggleMode} style={{ alignItems: 'center', marginTop: 24, padding: 8 }}>
+              <Text style={localStyles.toggleText}>
+                {authMode === 'login' ? T.auth.noAccount : T.auth.hasAccount}
+                <Text style={{ color: '#7C3AED', fontWeight: 'bold' }}>
+                  {' '}{authMode === 'login' ? T.auth.registerNow : T.auth.loginNow}
+                </Text>
               </Text>
             </TouchableOpacity>
           </View>
@@ -142,6 +175,46 @@ const AuthScreen = ({
       </TouchableWithoutFeedback>
     </KeyboardAvoidingView>
   );
+};
+
+const localStyles = {
+  inputGroup: {
+    backgroundColor: '#1C1C24',
+    borderRadius: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#2D2D3A',
+  },
+  inputIcon: {
+    paddingLeft: 16,
+  },
+  input: {
+    flex: 1,
+    padding: 16,
+    color: '#FFF',
+    fontSize: 16,
+  },
+  authButton: {
+    backgroundColor: '#7C3AED',
+    padding: 18,
+    borderRadius: 16,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  authButtonText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  toggleText: {
+    color: '#9CA3AF',
+  },
+  errorText: {
+    color: '#F87171',
+    textAlign: 'center',
+    marginTop: 8,
+  },
 };
 
 export default AuthScreen;

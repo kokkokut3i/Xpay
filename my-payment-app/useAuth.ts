@@ -1,0 +1,128 @@
+import { Session, User } from '@supabase/supabase-js';
+import * as LocalAuthentication from 'expo-local-authentication';
+import * as SecureStore from 'expo-secure-store';
+import { useEffect, useState } from 'react';
+import { supabase } from './supabase';
+
+export type AuthMode = 'login' | 'register';
+
+export const useAuth = () => {
+  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Нэвтрэх/Бүртгүүлэх формтой холбоотой state-үүд
+  const [authMode, setAuthMode] = useState<AuthMode>('login');
+  const [authPhone, setAuthPhone] = useState('');
+  const [authName, setAuthName] = useState('');
+  const [authPass, setAuthPass] = useState('');
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  useEffect(() => {
+    // Анх апп ачааллахад сесс байгаа эсэхийг шалгах
+    const fetchSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setSession(session);
+      setUser(session?.user ?? null);
+      setIsLoading(false);
+    };
+
+    fetchSession();
+
+    // Нэвтрэлтийн төлөв өөрчлөгдөх бүрд (login, logout) автоматаар state-г шинэчлэх
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: string, session: Session | null) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleAuth = async () => {
+    if (!authPhone || !authPass || (authMode === 'register' && !authName)) {
+      setAuthError('Мэдээллээ бүрэн оруулна уу.');
+      return;
+    }
+    if (authPass.length < 6) {
+      setAuthError('Нууц үг 6-аас доошгүй тэмдэгттэй байх ёстой.');
+      return;
+    }
+    if (authPhone.length !== 8) {
+      setAuthError('Утасны дугаар 8 оронтой байх ёстой.');
+      return;
+    }
+
+    setIsProcessing(true);
+    setAuthError(null);
+
+    const email = `${authPhone}@xpay.mn`;
+
+    try {
+      let response;
+      if (authMode === 'login') {
+        response = await supabase.auth.signInWithPassword({ email, password: authPass });
+      } else {
+        response = await supabase.auth.signUp({
+          email,
+          password: authPass,
+          options: { data: { full_name: authName, phone: authPhone } }
+        });
+      }
+
+      const { error, data } = response;
+      if (error) throw error;
+
+      // Биометрик мэдээллийг хадгалах
+      if (data.user) {
+        const hasHardware = await LocalAuthentication.hasHardwareAsync();
+        const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+        if (hasHardware && isEnrolled) {
+            await SecureStore.setItemAsync('user_phone', authPhone);
+            await SecureStore.setItemAsync('user_pass', authPass);
+        }
+      }
+
+    } catch (error: any) {
+      if (error.message.includes('Invalid login credentials')) {
+        // Supabase usually returns this for both wrong password and non-existent user for security reasons.
+        setAuthError('Утасны дугаар эсвэл нууц үг буруу байна.');
+      } else if (error.message.includes('User not found')) { // This is a hypothetical error, Supabase usually returns 'Invalid login credentials' for security. We add a check before login.
+        setAuthError('Бүртгэлгүй хэрэглэгч байна.');
+      } else if (error.message.includes('User already registered')) {
+        setAuthError('Энэ дугаар бүртгэлтэй байна.');
+      } else {
+        setAuthError(error.message);
+      }
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+  };
+
+  return {
+    // Auth төлөв
+    user,
+    session,
+    isAuthenticated: !!session,
+    isLoading,
+    isProcessing,
+    authError,
+    // Формын state-үүд
+    authMode,
+    authPhone,
+    authName,
+    authPass,
+    // Формын функцүүд
+    setAuthMode,
+    setAuthPhone,
+    setAuthName,
+    setAuthPass,
+    // Үндсэн функцүүд
+    handleAuth,
+    handleLogout,
+  };
+};

@@ -1,5 +1,5 @@
 import { Feather } from '@expo/vector-icons';
-import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { styles } from './styles';
 
 const ServiceTile = ({ icon, color, title, onPress }) => (
@@ -36,7 +36,9 @@ const HomeTab = ({
   setIsSearching, 
   setShowNotifications,
   setCustomAlert,
-  handleSelectPackage
+  handleSelectPackage,
+  refreshing,
+  onRefresh
 }) => {
   return (
     <View style={{ flex: 1, backgroundColor: '#0F0F14' }}>
@@ -62,7 +64,12 @@ const HomeTab = ({
       </View>
 
       {/* Гүйдэг контент хэсэг */}
-      <ScrollView showsVerticalScrollIndicator={false} style={styles.scrollArea}>
+      <ScrollView 
+        showsVerticalScrollIndicator={false} 
+        style={styles.scrollArea}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FFF" />
+        }>
         <View style={{ paddingHorizontal: 0 }}>
       <View style={styles.walletCard}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>

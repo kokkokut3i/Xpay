@@ -15,40 +15,43 @@ import { supabase } from './supabase';
 
 const { height } = Dimensions.get('window');
 
+interface DataPackage {
+  id: string;
+  gb: number;
+  price: number;
+  name: string;
+}
+
 interface TransferModalProps {
   visible: boolean;
   onClose: () => void;
   T: any;
-  mainBalance: number;
-  unitBalance: number;
-  mainData: number;
-  handleTransfer: (data: { method: 'phone' | 'account' | null; target: string; type: string; value: any }) => Promise<boolean>;
+  isProcessing: boolean;
+  error: string | null;
+  handleTransfer: (data: { method: 'phone' | 'account' | null; target: string; type: 'money' | 'unit' | 'data'; value: string | DataPackage }) => Promise<boolean>;
 }
+
+const dataPackages: DataPackage[] = [
+  { id: 'd1', gb: 1, price: 1000, name: '1GB Багц' },
+  { id: 'd2', gb: 3, price: 2500, name: '3GB Багц' },
+  { id: 'd3', gb: 5, price: 4500, name: '5GB Багц' },
+];
 
 const TransferModal: React.FC<TransferModalProps> = ({ 
   visible, 
   onClose, 
-  T, 
-  mainBalance, 
-  unitBalance, 
-  mainData, 
-  handleTransfer 
+  handleTransfer,
+  isProcessing,
+  error,
 }) => {
   const [step, setStep] = useState(1); // 1: Method, 2: Target, 3: Amount/Type
   const [method, setMethod] = useState<'phone' | 'account' | null>(null);
   const [target, setTarget] = useState('');
-  const [type, setType] = useState('money'); // 'money', 'unit', 'data'
+  const [type, setType] = useState<'money' | 'unit' | 'data'>('money'); // 'money', 'unit', 'data'
   const [amount, setAmount] = useState('');
-  const [isProcessing, setIsProcessing] = useState(false);
   const [recipientInfo, setRecipientInfo] = useState<{ name: string } | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
   const [verifyError, setVerifyError] = useState('');
-
-  const dataPackages = [
-    { id: 'd1', gb: 1, price: 1000, name: '1GB Багц' },
-    { id: 'd2', gb: 3, price: 2500, name: '3GB Багц' },
-    { id: 'd3', gb: 5, price: 4500, name: '5GB Багц' },
-  ];
 
   if (!visible) return null;
 
@@ -83,15 +86,13 @@ const TransferModal: React.FC<TransferModalProps> = ({
     setIsVerifying(false);
   };
 
-  const handleConfirm = async (dataPkg: any = null) => {
-    setIsProcessing(true);
+  const handleConfirm = async (dataPkg: DataPackage | null = null) => {
     const success = await handleTransfer({
       method,
       target,
-      type: dataPkg ? 'data' : type,
+      type: (dataPkg ? 'data' : type) as 'money' | 'unit' | 'data',
       value: dataPkg || amount
     });
-    setIsProcessing(false);
     if (success) resetAndClose();
   };
 
@@ -106,7 +107,7 @@ const TransferModal: React.FC<TransferModalProps> = ({
             </TouchableOpacity>
           </View>
 
-          {isProcessing ? (
+          {isProcessing || isVerifying ? (
             <View style={localStyles.center}>
               <ActivityIndicator size="large" color="#7C3AED" />
               <Text style={{ color: '#9CA3AF', marginTop: 12 }}>Боловсруулж байна...</Text>
@@ -162,7 +163,7 @@ const TransferModal: React.FC<TransferModalProps> = ({
                       <Text style={localStyles.btnText}>Шалгах</Text>
                     </TouchableOpacity>
                   )}
-                  {verifyError && <Text style={localStyles.errorText}>{verifyError}</Text>}
+                  {(verifyError || error) && <Text style={localStyles.errorText}>{verifyError || error}</Text>}
                   <TouchableOpacity 
                     onPress={() => { 
                       setStep(1); 
@@ -180,7 +181,7 @@ const TransferModal: React.FC<TransferModalProps> = ({
                     <>
                       <Text style={localStyles.label}>Шилжүүлэх төрөл</Text>
                       <View style={localStyles.chipRow}>
-                        {['money', 'unit', 'data'].map(t => (
+                        {(['money', 'unit', 'data'] as const).map(t => (
                           <TouchableOpacity key={t} onPress={() => setType(t)} style={[localStyles.chip, type === t && localStyles.activeChip]}>
                             <Text style={{ color: '#FFF', textTransform: 'capitalize' }}>{t === 'money' ? 'Мөнгө' : t === 'unit' ? 'Нэгж' : 'Дата'}</Text>
                           </TouchableOpacity>
@@ -190,7 +191,7 @@ const TransferModal: React.FC<TransferModalProps> = ({
                   ) : null}
 
                   {type === 'data' && method === 'phone' ? (
-                    dataPackages.map(pkg => (
+                    dataPackages.map((pkg) => (
                       <TouchableOpacity key={pkg.id} onPress={() => handleConfirm(pkg)} style={localStyles.pkgItem}>
                         <View><Text style={localStyles.pkgName}>{pkg.name}</Text><Text style={localStyles.pkgPrice}>₮{pkg.price.toLocaleString()}</Text></View>
                         <Feather name="send" size={18} color="#7C3AED" />

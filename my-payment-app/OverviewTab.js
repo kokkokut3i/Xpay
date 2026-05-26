@@ -1,10 +1,24 @@
 import { Feather } from '@expo/vector-icons';
-import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { styles } from './styles';
 
-const OverviewTab = ({ T, mainBalance, mainData, unitBalance, notificationList, setActiveAction, setCurrentTab, handleSelectPackage }) => {
+// Жишээ болгож: Энэ өгөгдлийг API эсвэл props-оор авах нь зүйтэй.
+const MOCK_ACTIVE_PACKAGES = [
+  { name: 'Social багц (30 хоног)', price: '2.5 GB', icon: 'facebook', color: '#3B82F6', progress: '80%' },
+  { name: 'Шөнийн хязгааргүй', price: '3 хоног', icon: 'moon', color: '#8B5CF6', progress: '30%' },
+  { name: 'Youtube багц', price: '500 MB', icon: 'youtube', color: '#F43F5E', progress: '15%' },
+];
+
+
+const OverviewTab = ({ T, mainBalance, mainData, unitBalance, notificationList, setActiveAction, setCurrentTab, handleSelectPackage, refreshing, onRefresh }) => {
   return (
-    <ScrollView showsVerticalScrollIndicator={false} style={styles.scrollArea}>
+    <ScrollView 
+      showsVerticalScrollIndicator={false} 
+      style={styles.scrollArea}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FFF" />
+      }
+    >
       {/* Overview Header */}
       <View style={styles.header}>
         <View>
@@ -131,11 +145,7 @@ const OverviewTab = ({ T, mainBalance, mainData, unitBalance, notificationList, 
       {/* Идэвхтэй нэмэлт багцууд */}
       <Text style={styles.sectionTitleInternal}>{T.overview.activePkgs}</Text>
       
-      {[
-        { name: 'Social багц (30 хоног)', price: '2.5 GB', icon: 'facebook', color: '#3B82F6', progress: '80%' },
-        { name: 'Шөнийн хязгааргүй', price: '3 хоног', icon: 'moon', color: '#8B5CF6', progress: '30%' },
-        { name: 'Youtube багц', price: '500 MB', icon: 'youtube', color: '#F43F5E', progress: '15%' },
-      ].map((pkg, idx) => (
+      {MOCK_ACTIVE_PACKAGES.map((pkg, idx) => (
         <TouchableOpacity key={idx} style={styles.categoryCard} onPress={() => setActiveAction('data')}>
           <View style={[styles.categoryIconBg, { backgroundColor: pkg.color }]}>
             <Feather name={pkg.icon} size={18} color="#FFF" />

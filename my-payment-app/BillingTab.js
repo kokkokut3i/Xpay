@@ -1,6 +1,6 @@
 import { Feather } from '@expo/vector-icons';
 import React from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { styles } from './styles';
 
 const BillingTab = ({ 
@@ -8,6 +8,8 @@ const BillingTab = ({
   isBillPaid, 
   lastPaymentDate, 
   setActiveAction, 
+  refreshing,
+  onRefresh,
   handlePayBill, 
   autoPayEnabled, 
   setAutoPayEnabled, 
@@ -28,7 +30,7 @@ const BillingTab = ({
   const billAmount = activePackage?.price || 24500;
 
   return (
-    <ScrollView showsVerticalScrollIndicator={false} style={styles.scrollArea}>
+    <ScrollView showsVerticalScrollIndicator={false} style={styles.scrollArea} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FFF" />}>
       {/* Толгой хэсэг */}
       <View style={styles.header}>
         <View>
