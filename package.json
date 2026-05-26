@@ -15,7 +15,7 @@
     "@react-navigation/bottom-tabs": "^7.15.5",
     "@react-navigation/elements": "^2.9.10",
     "@react-navigation/native": "^7.1.33",
-    "@supabase/supabase-js": "^2.106.1",
+    "@supabase/supabase-js": "^2.39.3",
     "expo": "54",
     "expo-constants": "~18.0.13",
     "expo-device": "~8.0.10",
@@ -44,7 +44,11 @@
   },
   "devDependencies": {
     "@types/react": "~19.1.10",
+    "babel-plugin-module-resolver": "^5.0.3",
     "typescript": "~5.9.2"
   },
-  "private": true
+  "private": true,
+  "browser": {
+    "@opentelemetry/api": false
+  }
 }
