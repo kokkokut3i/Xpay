@@ -1,7 +1,8 @@
-import { Feather } from '@expo/vector-icons';
-import React, { useCallback, useEffect, useState } from 'react';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   Modal,
   ScrollView,
   StatusBar,
@@ -36,8 +37,64 @@ import { useTransfer } from '../../my-payment-app/useTransfer';
 import { AppPackage, useUserProfile } from '../../my-payment-app/useUserProfile';
 
 export default function Index() {
+  // --- GLOBAL BACKGROUND ANIMATION ---
+  const blob1Anim = useRef(new Animated.Value(0)).current;
+  const blob2Anim = useRef(new Animated.Value(0)).current;
+  const blob3Anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const animate = (val: Animated.Value, duration: number) => {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(val, { toValue: 1, duration, useNativeDriver: true }),
+          Animated.timing(val, { toValue: 0, duration, useNativeDriver: true }),
+        ])
+      ).start();
+    };
+    animate(blob1Anim, 15000);
+    animate(blob2Anim, 20000);
+    animate(blob3Anim, 25000);
+  }, []);
+
+  const blob1Style = {
+    transform: [
+      { translateX: blob1Anim.interpolate({ inputRange: [0, 1], outputRange: [0, 50] }) },
+      { translateY: blob1Anim.interpolate({ inputRange: [0, 1], outputRange: [0, 30] }) },
+    ],
+  };
+  const blob2Style = {
+    transform: [
+      { translateX: blob2Anim.interpolate({ inputRange: [0, 1], outputRange: [0, -60] }) },
+      { translateY: blob2Anim.interpolate({ inputRange: [0, 1], outputRange: [0, -40] }) },
+    ],
+  };
+  const blob3Style = {
+    transform: [
+      { scale: blob3Anim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.2] }) },
+      { translateX: blob3Anim.interpolate({ inputRange: [0, 1], outputRange: [0, 30] }) },
+    ],
+  };
+
   // --- AUTHENTICATION LOGIC (useAuth hook-оос авна) ---
-  const { user, isAuthenticated, isLoading, authMode, authPhone, authName, authPass, setAuthMode, setAuthPhone, setAuthName, setAuthPass, handleAuth, handleLogout, isProcessing, authError } = useAuth();
+  const { 
+    user, 
+    isAuthenticated, 
+    isLoading, 
+    authMode, 
+    authPhone, 
+    authName, 
+    authPass, 
+    setAuthMode, 
+    setAuthPhone, 
+    setAuthName, 
+    setAuthPass, 
+    handleAuth, 
+    handleLogout, 
+    handleBiometricLogin,
+    canUseBiometric,
+    isProcessing, 
+    authError 
+  } = useAuth();
 
   // --- USER PROFILE LOGIC (useUserProfile hook-оос авна) ---
   const {
@@ -61,6 +118,13 @@ export default function Index() {
   const T = (translations as any)[appLanguage] || (translations as any)['MN'];
 
   const [currentTab, setCurrentTab] = useState('home');
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      setCurrentTab('home');
+    }
+  }, [isAuthenticated]);
+
   const [showAIChat, setShowAIChat] = useState(false);
   
   type ActionType = 'data' | 'unit' | 'topup' | 'transfer' | 'more' | null;
@@ -124,8 +188,6 @@ export default function Index() {
     { id: 'topup', title: 'Данс цэнэглэх', keywords: 'topup dans tsenegleh bank', icon: 'plus-circle', color: '#8B5CF6', action: () => handleSearchAction(() => setActiveAction('topup'), searchQuery) },
     { id: 'transfer', title: 'Шилжүүлэг', keywords: 'transfer shiljuuleg send', icon: 'send', color: '#EC4899', action: () => handleSearchAction(() => setActiveAction('transfer'), searchQuery) },
     { id: 'more', title: 'Бусад үйлчилгээ', keywords: 'busad more uramshuulal hitone news', icon: 'grid', color: '#8B5CF6', action: () => handleSearchAction(() => setShowAllServices(true), searchQuery) },
-    { id: 'insurance', title: 'Утасны даатгал', keywords: 'daatgal insurance utas', icon: 'shield', color: '#8B5CF6', action: () => handleSearchAction(() => setCustomAlert({ visible: true, message: "Гар утасны даатгал үйлчилгээ удахгүй нээгдэнэ." }), searchQuery) },
-    { id: 'entertainment', title: 'Entertainment', keywords: 'entertainment kino content uramshuulal', icon: 'play', color: '#F43F5E', action: () => handleSearchAction(() => setCustomAlert({ visible: true, message: "Контент үзэх эрхийг удахгүй авдаг болно." }), searchQuery) },
   ];
 
   const banks = [
@@ -169,10 +231,23 @@ export default function Index() {
     setChatInput('');
     
     // Mock AI response
+    const lowerInput = chatInput.toLowerCase();
     setTimeout(() => {
-      const botMsg = { id: Date.now() + 1, text: "Би таны хүсэлтийг хүлээн авлаа. Танд туслахдаа баяртай байна!", sender: 'ai' };
+      let response = "Би таны хүсэлтийг хүлээн авлаа. Танд өөрөөр туслах зүйл байна уу?";
+      
+      if (lowerInput.includes('данс') || lowerInput.includes('үлдэгдэл')) {
+        response = `Таны одоогийн дансны үлдэгдэл ₮${mainBalance.toLocaleString()} байна. Цэнэглэхийг хүсвэл 'Цэнэглэх' товчийг ашиглана уу.`;
+      } else if (lowerInput.includes('дата')) {
+        response = `Танд одоогоор ${mainData.toFixed(1)}GB дата байна. Нэмэлт дата авахыг хүсвэл Дата багц цэс рүү ороорой.`;
+      } else if (lowerInput.includes('төлбөр')) {
+        response = isBillPaid 
+          ? "Таны энэ сарын төлбөр төлөгдсөн байна. Баярлалаа!" 
+          : `Таны төлөх төлбөр ₮${(activePackage?.price || 24500).toLocaleString()} байна. Төлбөр цэс рүү орж төлнө үү.`;
+      }
+
+      const botMsg = { id: Date.now() + 1, text: response, sender: 'ai' };
       setChatMessages(prev => [...prev, botMsg]);
-    }, 1000);
+    }, 800);
   };
 
   const handlePaymentConfirm = async (method: 'card' | 'unit') => {
@@ -211,6 +286,7 @@ export default function Index() {
       setMainData(mainData + selectedDataPkg.gb);
       setShowPayment(false);
       setActiveAction(null);
+      addNotification('Дата багц авлаа', `${selectedDataPkg.gb}GB дата багц амжилттай идэвхжлээ.`, 'wifi', '#10B981');
       setCustomAlert({ visible: true, message: 'Амжилттай!' });
     } else {
       setCustomAlert({ visible: true, message: 'Гүйлгээний алдаа: ' + error.message });
@@ -272,6 +348,7 @@ export default function Index() {
       setMainBalance(mainBalance - amount);
       setIsBillPaid(true);
       setLastPaymentDate(paymentDate);
+      addNotification('Төлбөр төлөгдлөө', `₮${amount.toLocaleString()} амжилттай төлөгдлөө.`, 'credit-card', '#3B82F6');
       setCustomAlert({ visible: true, message: 'Төлбөр төлөгдлөө.' });
     } else {
       setCustomAlert({ visible: true, message: 'Төлбөр төлөхөд алдаа гарлаа: ' + error.message });
@@ -314,6 +391,7 @@ export default function Index() {
     setUnitBalance(newUnitBalance);
     setMainData(newData);
     setActiveAction(null);
+    addNotification('Нэгж/Дата авлаа', `Та ${cardName}-н [${optionName}]-ийг авлаа.`, 'zap', '#F59E0B');
     setCustomAlert({
       visible: true,
       message: `Амжилттай! Та ${cardName}-н [${optionName}]-ийг авлаа.`
@@ -355,6 +433,23 @@ export default function Index() {
     }
   };
 
+  // --- ШИЛЖҮҮЛГИЙГ МЭДЭГДЭЛТЭЙ ХОЛБОХ ---
+  const handleTransferWithNotification = async (data: any) => {
+    const success = await handleTransfer(data);
+    if (success) {
+      const typeLabel = data.type === 'money' ? '₮' : (data.type === 'unit' ? ' нэгж' : ' дата');
+      const valueDisplay = data.type === 'data' ? data.value.name : `${data.value.toLocaleString()}${typeLabel}`;
+      
+      addNotification(
+        'Шилжүүлэг амжилттай', 
+        `${data.target} руу ${valueDisplay} шилжүүллээ.`, 
+        'send', 
+        '#EC4899'
+      );
+    }
+    return success;
+  };
+
   // --- БАГЦ СОЛИХ ФУНКЦ ---
   const handlePackageChange = async (selectedPkg: AppPackage) => {
     if (!user || !isBillPaid) return;
@@ -388,15 +483,25 @@ export default function Index() {
   const handleServiceTypeChange = async (newType: 'prepaid' | 'postpaid') => {
     if (!user || serviceType === newType) return;
 
-    setServiceType(newType); // Optimistic update
+    const previousType = serviceType;
+    setServiceType(newType); // UI-г шууд шинэчлэх
+
     const { error } = await supabase
-        .from('profiles')
-        .update({ service_type: newType })
-        .eq('id', user!.id);
+      .from('profiles')
+      .update({ service_type: newType })
+      .eq('id', user.id);
 
     if (error) {
-        setCustomAlert({ visible: true, message: 'Үйлчилгээний төрөл солиход алдаа гарлаа.' });
-        setServiceType(serviceType as 'prepaid' | 'postpaid'); // Revert on error
+      console.error('Error updating service type:', error);
+      setCustomAlert({ visible: true, message: 'Үйлчилгээний төрөл солиход алдаа гарлаа: ' + error.message });
+      setServiceType(previousType as 'prepaid' | 'postpaid'); // Алдаа гарвал өмнөх төлөв рүү буцаана
+    } else {
+      addNotification(
+        'Амжилттай', 
+        `Үйлчилгээний төрөл ${newType === 'prepaid' ? 'Урьдчилсан' : 'Дараа'} төлбөрт болж шинэчлэгдлээ.`, 
+        'check-circle', 
+        '#10B981'
+      );
     }
   };
 
@@ -413,9 +518,14 @@ export default function Index() {
 
   if (isLoading) {
     return (
-      <View style={{ flex: 1, backgroundColor: '#0F0F14', justifyContent: 'center', alignItems: 'center' }}>
+      <View style={styles.splashContainer}>
         <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-        <ActivityIndicator size="large" color="#7C3AED" />
+        <View style={styles.logoCircle}>
+          <Text style={styles.logoText}>X</Text>
+        </View>
+        <Text style={styles.appName}>XPAY</Text>
+        <Text style={{ color: '#6B7280', fontSize: 13, marginTop: 12, letterSpacing: 3, fontWeight: '500' }}>ДИЖИТАЛ ХЭМНЭЛ</Text>
+        <ActivityIndicator size="small" color="#7C3AED" style={{ marginTop: 40 }} />
       </View>
     );
   }
@@ -424,6 +534,11 @@ export default function Index() {
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
       
+      {/* Global Background Blobs */}
+      <Animated.View style={[styles.bgBlob1, blob1Style]} />
+      <Animated.View style={[styles.bgBlob2, blob2Style]} />
+      <Animated.View style={[styles.bgBlob3, blob3Style]} />
+
       {toast.visible && (
         <TouchableOpacity 
           activeOpacity={0.9}
@@ -450,6 +565,8 @@ export default function Index() {
             handleAuth={handleAuth} 
             isProcessing={isProcessing}
             authError={authError}
+            canUseBiometric={canUseBiometric}
+            handleBiometricLogin={handleBiometricLogin}
           />
         ) : (
           <View style={{ flex: 1 }}>
@@ -457,7 +574,7 @@ export default function Index() {
               <HomeTab 
                 T={T} userName={userName} userPhone={authPhone} mainBalance={mainBalance} mainData={mainData} unitBalance={unitBalance}
                 setActiveAction={setActiveAction} setCurrentTab={setCurrentTab} refreshing={refreshing} onRefresh={onRefresh}
-                setIsSearching={setIsSearching} setShowNotifications={setShowNotifications}
+                setIsSearching={setIsSearching} setShowNotifications={setShowNotifications} setShowAllServices={setShowAllServices}
                 setCustomAlert={setCustomAlert} handleSelectPackage={handleSelectPackage}
               />
             )}
@@ -467,12 +584,14 @@ export default function Index() {
                 mainBalance={mainBalance}
                 mainData={mainData}
                 unitBalance={unitBalance}
+                activePackage={activePackage}
                 notificationList={notificationList}
                 setActiveAction={setActiveAction} 
                 refreshing={refreshing}
                 onRefresh={onRefresh}
                 setCurrentTab={setCurrentTab} 
                 handleSelectPackage={handleSelectPackage} 
+                setShowNotifications={setShowNotifications}
               />
             )}
             {currentTab === 'billing' && (
@@ -522,7 +641,7 @@ export default function Index() {
               </TouchableOpacity>
               <View style={styles.centerNavBtnWrapper}>
                 <TouchableOpacity style={styles.centerNavBtn} onPress={() => setShowAIChat(true)}>
-                  <Feather name="message-square" size={24} color="#FFF" />
+                  <MaterialCommunityIcons name="robot" size={26} color="#FFF" />
                 </TouchableOpacity>
               </View>
               <TouchableOpacity style={styles.navItem} onPress={() => setCurrentTab('billing')}>
@@ -560,7 +679,7 @@ export default function Index() {
           visible={activeAction === 'transfer'} 
           onClose={() => { setActiveAction(null); setTransferError(null); }} 
           T={T} 
-          handleTransfer={handleTransfer} 
+          handleTransfer={handleTransferWithNotification} 
           isProcessing={isTransferring}
           error={transferError}
         />

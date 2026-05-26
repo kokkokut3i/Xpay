@@ -1,4 +1,4 @@
-import { Feather } from '@expo/vector-icons';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import React, { useEffect, useRef } from 'react';
 import {
   ActivityIndicator,
@@ -6,6 +6,7 @@ import {
   Keyboard,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
@@ -27,6 +28,8 @@ const AuthScreen = ({
   handleAuth,
   isProcessing, // Шинээр нэмсэн
   authError, // Шинээр нэмсэн
+  canUseBiometric, // Шинээр нэмсэн
+  handleBiometricLogin, // Шинээр нэмсэн
 }) => {
   // Анимацийн утгуудыг тохируулах
   const blob1Anim = useRef(new Animated.Value(0)).current;
@@ -34,28 +37,6 @@ const AuthScreen = ({
   const errorAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Бөмбөлөг 1-ийн хөдөлгөөн (Loop)
-    const startBlob1 = () => {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(blob1Anim, { toValue: 1, duration: 8000, useNativeDriver: true }),
-          Animated.timing(blob1Anim, { toValue: 0, duration: 8000, useNativeDriver: true }),
-        ])
-      ).start();
-    };
-
-    // Бөмбөлөг 2-ийн хөдөлгөөн (Loop)
-    const startBlob2 = () => {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(blob2Anim, { toValue: 1, duration: 10000, useNativeDriver: true }),
-          Animated.timing(blob2Anim, { toValue: 0, duration: 10000, useNativeDriver: true }),
-        ])
-      ).start();
-    };
-
-    startBlob1();
-    startBlob2();
   }, []);
 
   useEffect(() => {
@@ -100,78 +81,92 @@ const AuthScreen = ({
       <Animated.View style={[styles.bgBlob2, blob2Style]} />
 
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <View style={{ flex: 1, justifyContent: 'center', padding: 30 }}>
-          <View style={{ alignItems: 'center', marginBottom: 50 }}>
-            <View style={styles.headerLogo}>
-              <Text style={styles.headerLogoText}>X</Text>
+        <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 30 }} showsVerticalScrollIndicator={false}>
+          <View style={{ flex: 1, justifyContent: 'center' }}>
+            <View style={{ alignItems: 'center', marginBottom: 50 }}>
+              <View style={styles.headerLogo}>
+              <Text style={[styles.headerLogoText, { fontStyle: 'normal' }]}>X</Text>
+              </View>
+            <Text style={[styles.appName, { fontSize: 28 }]}>{T.auth.welcome || 'XPAY'}</Text>
+              <Text style={styles.subGreeting}>{authMode === 'login' ? (T.auth.loginSubtitle || 'Нэвтрэх') : (T.auth.registerSubtitle || 'Бүртгүүлэх')}</Text>
             </View>
-            <Text style={styles.appName}>{T.auth.welcome}</Text>
-            <Text style={styles.subGreeting}>{authMode === 'login' ? T.auth.loginSubtitle : T.auth.registerSubtitle}</Text>
-          </View>
 
-          <View style={{ gap: 16 }}>
-            {authMode === 'register' && (
+            <View style={{ gap: 16 }}>
+              {authMode === 'register' && (
+                <View style={localStyles.inputGroup}>
+                  <Feather name="user" size={20} color="#6B7280" style={localStyles.inputIcon} />
+                  <TextInput
+                    style={localStyles.input}
+                    placeholder={T.auth.namePlaceholder || 'Нэр'}
+                    placeholderTextColor="#6B7280"
+                    value={authName}
+                    onChangeText={setAuthName}
+                  />
+                </View>
+              )}
+
               <View style={localStyles.inputGroup}>
-                <Feather name="user" size={20} color="#6B7280" style={localStyles.inputIcon} />
+                <Feather name="phone" size={20} color="#6B7280" style={localStyles.inputIcon} />
                 <TextInput
                   style={localStyles.input}
-                  placeholder={T.auth.namePlaceholder}
+                  placeholder={T.auth.phonePlaceholder || 'Утасны дугаар'}
                   placeholderTextColor="#6B7280"
-                  value={authName}
-                  onChangeText={setAuthName}
+                  keyboardType="number-pad"
+                  value={authPhone}
+                  onChangeText={setAuthPhone}
+                  maxLength={8}
                 />
               </View>
-            )}
 
-            <View style={localStyles.inputGroup}>
-              <Feather name="phone" size={20} color="#6B7280" style={localStyles.inputIcon} />
-              <TextInput
-                style={localStyles.input}
-                placeholder={T.auth.phonePlaceholder}
-                placeholderTextColor="#6B7280"
-                keyboardType="number-pad"
-                value={authPhone}
-                onChangeText={setAuthPhone}
-                maxLength={8}
-              />
-            </View>
+              <View style={localStyles.inputGroup}>
+                <Feather name="lock" size={20} color="#6B7280" style={localStyles.inputIcon} />
+                <TextInput
+                  style={localStyles.input}
+                  placeholder={T.auth.passPlaceholder || 'Нууц үг'}
+                  placeholderTextColor="#6B7280"
+                  secureTextEntry
+                  value={authPass}
+                  onChangeText={setAuthPass}
+                />
+              </View>
 
-            <View style={localStyles.inputGroup}>
-              <Feather name="lock" size={20} color="#6B7280" style={localStyles.inputIcon} />
-              <TextInput
-                style={localStyles.input}
-                placeholder={T.auth.passPlaceholder}
-                placeholderTextColor="#6B7280"
-                secureTextEntry
-                value={authPass}
-                onChangeText={setAuthPass}
-              />
-            </View>
-
-            {authError && (
-              <Animated.View style={{ transform: [{ translateX: errorAnim }] }}>
-                <Text style={localStyles.errorText}>{authError}</Text>
-              </Animated.View>
-            )}
-
-            <TouchableOpacity onPress={handleAuth} disabled={isProcessing} style={[localStyles.authButton, isProcessing && { opacity: 0.7 }]}>
-              {isProcessing ? (
-                <ActivityIndicator color="#FFF" />
-              ) : (
-                <Text style={localStyles.authButtonText}>{authMode === 'login' ? T.auth.loginBtn : T.auth.registerBtn}</Text>
+              {authError && (
+                <Animated.View style={{ transform: [{ translateX: errorAnim }] }}>
+                  <Text style={localStyles.errorText}>{authError}</Text>
+                </Animated.View>
               )}
-            </TouchableOpacity>
 
-            <TouchableOpacity onPress={toggleMode} style={{ alignItems: 'center', marginTop: 24, padding: 8 }}>
-              <Text style={localStyles.toggleText}>
-                {authMode === 'login' ? T.auth.noAccount : T.auth.hasAccount}
-                <Text style={{ color: '#7C3AED', fontWeight: 'bold' }}>
-                  {' '}{authMode === 'login' ? T.auth.registerNow : T.auth.loginNow}
+              <View style={{ flexDirection: 'row', gap: 12 }}>
+                <TouchableOpacity 
+                  onPress={handleAuth} 
+                  disabled={isProcessing} 
+                  style={[localStyles.authButton, { flex: 1 }, isProcessing && { opacity: 0.7 }]}
+                >
+                  {isProcessing ? (
+                    <ActivityIndicator color="#FFF" />
+                  ) : (
+                    <Text style={localStyles.authButtonText}>{authMode === 'login' ? (T.auth.loginBtn || 'Нэвтрэх') : (T.auth.registerBtn || 'Бүртгүүлэх')}</Text>
+                  )}
+                </TouchableOpacity>
+                
+                {authMode === 'login' && canUseBiometric && (
+                  <TouchableOpacity onPress={handleBiometricLogin} style={localStyles.biometricButton}>
+                    <MaterialCommunityIcons name="fingerprint" size={28} color="#FFF" />
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              <TouchableOpacity onPress={toggleMode} style={{ alignItems: 'center', marginTop: 24, padding: 8 }}>
+                <Text style={localStyles.toggleText}>
+                  {authMode === 'login' ? (T.auth.noAccount || 'Шинэ хэрэглэгч үү?') : (T.auth.hasAccount || 'Бүртгэлтэй юу?')}
+                  <Text style={{ color: '#7C3AED', fontWeight: 'bold' }}>
+                    {' '}{authMode === 'login' ? (T.auth.registerNow || 'Бүртгүүлэх') : (T.auth.loginNow || 'Нэвтрэх')}
+                  </Text>
                 </Text>
-              </Text>
-            </TouchableOpacity>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
+        </ScrollView>
       </TouchableWithoutFeedback>
     </KeyboardAvoidingView>
   );
@@ -206,6 +201,15 @@ const localStyles = {
     color: '#FFF',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  biometricButton: {
+    backgroundColor: '#1C1C24',
+    width: 58,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#2D2D3A',
   },
   toggleText: {
     color: '#9CA3AF',

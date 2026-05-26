@@ -18,6 +18,7 @@ export const useAuth = () => {
   const [authPass, setAuthPass] = useState('');
   const [authError, setAuthError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [canUseBiometric, setCanUseBiometric] = useState(false);
 
   useEffect(() => {
     // Анх апп ачааллахад сесс байгаа эсэхийг шалгах
@@ -26,6 +27,12 @@ export const useAuth = () => {
       setSession(session);
       setUser(session?.user ?? null);
       setIsLoading(false);
+
+      // Хадгалагдсан биометрик мэдээлэл байгаа эсэхийг шалгах
+      const savedPhone = await SecureStore.getItemAsync('user_phone');
+      const savedPass = await SecureStore.getItemAsync('user_pass');
+      const hasHardware = await LocalAuthentication.hasHardwareAsync();
+      setCanUseBiometric(!!(savedPhone && savedPass && hasHardware));
     };
 
     fetchSession();
@@ -38,6 +45,45 @@ export const useAuth = () => {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  const handleBiometricLogin = async () => {
+    try {
+      const hasHardware = await LocalAuthentication.hasHardwareAsync();
+      if (!hasHardware) return;
+
+      const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+      if (!isEnrolled) {
+        setAuthError('Биометрик мэдээлэл бүртгэгдээгүй байна.');
+        return;
+      }
+
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: 'Нэвтрэх',
+        fallbackLabel: 'Нууц үг ашиглах',
+      });
+
+      if (result.success) {
+        setIsProcessing(true);
+        const phone = await SecureStore.getItemAsync('user_phone');
+        const pass = await SecureStore.getItemAsync('user_pass');
+
+        if (phone && pass) {
+          const { error } = await supabase.auth.signInWithPassword({
+            email: `${phone}@xpay.mn`,
+            password: pass,
+          });
+          if (error) throw error;
+        } else {
+          setAuthError('Хадгалагдсан мэдээлэл олдсонгүй.');
+        }
+      }
+    } catch (error: any) {
+      console.error('Biometric Auth Error:', error);
+      setAuthError('Биометрик нэвтрэлт амжилтгүй: ' + error.message);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   const handleAuth = async () => {
     if (!authPhone || !authPass || (authMode === 'register' && !authName)) {
@@ -124,5 +170,8 @@ export const useAuth = () => {
     // Үндсэн функцүүд
     handleAuth,
     handleLogout,
+    handleBiometricLogin,
+    canUseBiometric,
+    setCanUseBiometric,
   };
 };

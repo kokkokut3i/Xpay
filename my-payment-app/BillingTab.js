@@ -46,13 +46,15 @@ const BillingTab = ({
       <View style={localStyles.tabContainer}>
         <TouchableOpacity 
           style={[localStyles.tabButton, serviceType === 'prepaid' && localStyles.activeTab]} 
-          onPress={() => handleServiceTypeChange('prepaid')} // Дотоод state-ийн оронд prop ашиглах
+          onPress={() => handleServiceTypeChange('prepaid')}
         >
-          <Text style={[localStyles.tabText, serviceType === 'prepaid' && localStyles.activeTabText]}>{T.billing.prepaid}</Text>
+          <Text style={[localStyles.tabText, serviceType === 'prepaid' && localStyles.activeTabText]}>
+            {T.billing.prepaid}
+          </Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[localStyles.tabButton, serviceType === 'postpaid' && localStyles.activeTab]} 
-          onPress={() => handleServiceTypeChange('postpaid')} // Дотоод state-ийн оронд prop ашиглах
+          onPress={() => handleServiceTypeChange('postpaid')}
         >
           <Text style={[localStyles.tabText, serviceType === 'postpaid' && localStyles.activeTabText]}>{T.billing.postpaid}</Text>
         </TouchableOpacity>
@@ -164,6 +166,7 @@ const BillingTab = ({
           </View>
         </View>
       )}
+      {/* Эндээс доошхи бүх элементүүдийг нэг Fragment дотор оруулсан */}
 
       {/* Картууд */}
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>

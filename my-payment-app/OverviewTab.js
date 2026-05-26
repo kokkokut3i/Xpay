@@ -2,19 +2,63 @@ import { Feather } from '@expo/vector-icons';
 import { RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { styles } from './styles';
 
-// Жишээ болгож: Энэ өгөгдлийг API эсвэл props-оор авах нь зүйтэй.
-const MOCK_ACTIVE_PACKAGES = [
-  { name: 'Social багц (30 хоног)', price: '2.5 GB', icon: 'facebook', color: '#3B82F6', progress: '80%' },
-  { name: 'Шөнийн хязгааргүй', price: '3 хоног', icon: 'moon', color: '#8B5CF6', progress: '30%' },
-  { name: 'Youtube багц', price: '500 MB', icon: 'youtube', color: '#F43F5E', progress: '15%' },
-];
+const OverviewTab = ({ T, mainBalance, mainData, unitBalance, activePackage, notificationList, setActiveAction, setCurrentTab, handleSelectPackage, refreshing, onRefresh, setShowNotifications }) => {
+  // Бодит өгөгдөл дээр суурилсан идэвхтэй багцуудын жагсаалтыг үүсгэх
+  const activeItems = [];
 
+  // 1. Үндсэн дата үлдэгдэл
+  if (mainData > 0) {
+    activeItems.push({
+      id: 'data',
+      name: 'Үндсэн дата багц',
+      price: `${mainData.toFixed(1)} GB`,
+      icon: 'wifi',
+      color: '#10B981',
+      progress: '100%'
+    });
+  }
 
-const OverviewTab = ({ T, mainBalance, mainData, unitBalance, notificationList, setActiveAction, setCurrentTab, handleSelectPackage, refreshing, onRefresh }) => {
+  // 2. Идэвхтэй үндсэн багц (Plan)
+  if (activePackage) {
+    activeItems.push({
+      id: 'plan',
+      name: activePackage.name,
+      price: T.common.active,
+      icon: 'layers',
+      color: '#8B5CF6',
+      progress: '100%'
+    });
+  }
+
+  // 3. Нэгж (Хэрэв байгаа бол)
+  if (unitBalance > 0) {
+    activeItems.push({
+      id: 'unit',
+      name: 'Нэгж',
+      price: `₮${unitBalance.toLocaleString()}`,
+      icon: 'zap',
+      color: '#F59E0B',
+      progress: '100%'
+    });
+  }
+
+  // Диаграммын бодит өгөгдөл (Жишээ)
+  const weeklyData = [
+    { day: T.overview.days[0], value: 1.2 },
+    { day: T.overview.days[1], value: 2.8 },
+    { day: T.overview.days[2], value: 0.9 },
+    { day: T.overview.days[3], value: 3.5 }, // Хамгийн өндөр
+    { day: T.overview.days[4], value: 2.1 },
+    { day: T.overview.days[5], value: 4.2 },
+    { day: T.overview.days[6], value: 1.5 },
+  ];
+  const maxValue = Math.max(...weeklyData.map(d => d.value));
+
   return (
     <ScrollView 
       showsVerticalScrollIndicator={false} 
       style={styles.scrollArea}
+      contentContainerStyle={{ paddingBottom: 160 }}
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FFF" />
       }
@@ -47,6 +91,29 @@ const OverviewTab = ({ T, mainBalance, mainData, unitBalance, notificationList, 
         <Text style={styles.overviewCompareText}>{T.overview.compare} <Text style={{color: '#10B981'}}>+2.4 GB</Text> {T.overview.moreThan}</Text>
       </TouchableOpacity>
 
+      {/* Бодит динамик диаграмм */}
+      <Text style={styles.sectionTitleInternal}>{T.overview.weekly}</Text>
+      <View style={styles.chartContainer}>
+        <View style={styles.barsRow}>
+          {weeklyData.map((item, index) => {
+            const isPeak = item.value === maxValue;
+            // Хамгийн өндөр багана нь 140px байна гэж тооцвол:
+            const barHeight = (item.value / maxValue) * 140;
+            return (
+              <View key={index} style={styles.barWrapper}>
+                <View style={[styles.bar, { 
+                  height: barHeight, 
+                  backgroundColor: isPeak ? '#3B82F6' : 'rgba(139, 92, 246, 0.3)',
+                  width: 14,
+                  borderRadius: 7
+                }]} />
+                <Text style={[styles.barLabel, isPeak && { color: '#FFF', fontWeight: 'bold' }]}>{item.day}</Text>
+              </View>
+            );
+          })}
+        </View>
+      </View>
+
       {/* Дансны бодит үлдэгдлүүд */}
       <View style={{ flexDirection: 'row', paddingHorizontal: 4, marginBottom: 20 }}>
         <View style={{ flex: 1, backgroundColor: '#1C1C24', padding: 16, borderRadius: 20, marginRight: 8, borderWidth: 1, borderColor: '#2D2D3A' }}>
@@ -60,10 +127,17 @@ const OverviewTab = ({ T, mainBalance, mainData, unitBalance, notificationList, 
       </View>
 
       {/* Дансны хуулга (Гүйлгээний түүх) - Зайг нь нэмж засав */}
-      <Text style={[styles.sectionTitleInternal, { marginTop: 24, marginBottom: 16 }]}>Дансны хуулга</Text>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 24, marginBottom: 16 }}>
+        <Text style={[styles.sectionTitleInternal, { marginTop: 0, marginBottom: 0 }]}>Дансны хуулга</Text>
+        {notificationList && notificationList.length > 3 && (
+          <TouchableOpacity onPress={() => setShowNotifications(true)}>
+            <Text style={{ color: '#3B82F6', fontSize: 13 }}>Бүгдийг харах</Text>
+          </TouchableOpacity>
+        )}
+      </View>
       <View style={{ marginBottom: 24, paddingHorizontal: 4 }}>
         {notificationList && notificationList.length > 0 ? (
-          notificationList.map((item) => (
+          notificationList.slice(0, 3).map((item) => (
             <View 
               key={item.id} 
               style={{ 
@@ -108,60 +182,29 @@ const OverviewTab = ({ T, mainBalance, mainData, unitBalance, notificationList, 
         </TouchableOpacity>
       </View>
 
-      {/* График хэсэг (Дата хэрэглээгээр) */}
-      <Text style={styles.sectionTitleInternal}>{T.overview.weekly}</Text>
-      <View style={styles.chartContainer}>
-        <View style={styles.barsRow}>
-          {T.overview.days.map((day, index) => {
-            const heights = [60, 110, 40, 140, 90, 75, 50];
-            const isPeak = index === 3;
-            return (
-              <View key={index} style={styles.barWrapper}>
-                <View style={[styles.bar, { height: heights[index], backgroundColor: isPeak ? '#3B82F6' : 'rgba(139, 92, 246, 0.3)' }]} />
-                <Text style={[styles.barLabel, isPeak && { color: '#FFF' }]}>{day}</Text>
-              </View>
-            );
-          })}
-        </View>
-      </View>
-
-      {/* Танд санал болгох багц */}
-      <Text style={styles.sectionTitleInternal}>{T.overview.recommend}</Text>
-      <TouchableOpacity 
-        onPress={() => handleSelectPackage(7, 7000)}
-        style={{ backgroundColor: '#1E1B4B', padding: 18, borderRadius: 20, borderLeftWidth: 4, borderLeftColor: '#10B981', marginBottom: 5 }}
-      >
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <View>
-            <Text style={{ color: '#10B981', fontWeight: 'bold', fontSize: 12, letterSpacing: 1 }}>MOST POPULAR</Text>
-            <Text style={{ color: '#FFF', fontSize: 16, fontWeight: 'bold', marginTop: 4 }}>7GB / 7 Хоног</Text>
-          </View>
-          <View style={{ backgroundColor: 'rgba(16, 185, 129, 0.2)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10 }}>
-            <Text style={{ color: '#FFF', fontWeight: 'bold' }}>₮7,000</Text>
-          </View>
-        </View>
-      </TouchableOpacity>
-
       {/* Идэвхтэй нэмэлт багцууд */}
       <Text style={styles.sectionTitleInternal}>{T.overview.activePkgs}</Text>
       
-      {MOCK_ACTIVE_PACKAGES.map((pkg, idx) => (
-        <TouchableOpacity key={idx} style={styles.categoryCard} onPress={() => setActiveAction('data')}>
-          <View style={[styles.categoryIconBg, { backgroundColor: pkg.color }]}>
-            <Feather name={pkg.icon} size={18} color="#FFF" />
-          </View>
-          <View style={{ flex: 1, marginLeft: 16 }}>
-            <View style={styles.categoryInfoRow}>
-              <Text style={styles.categoryName}>{pkg.name}</Text>
-              <Text style={styles.categoryPrice}>{pkg.price}</Text>
+      {activeItems.length > 0 ? (
+        activeItems.map((pkg) => (
+          <TouchableOpacity key={pkg.id} style={styles.categoryCard} onPress={() => pkg.id === 'plan' ? setCurrentTab('billing') : setActiveAction('data')}>
+            <View style={[styles.categoryIconBg, { backgroundColor: pkg.color }]}>
+              <Feather name={pkg.icon} size={18} color="#FFF" />
             </View>
-            <View style={styles.progressTrack}>
-              <View style={[styles.progressFill, { width: pkg.progress, backgroundColor: pkg.color }]} />
+            <View style={{ flex: 1, marginLeft: 16 }}>
+              <View style={styles.categoryInfoRow}>
+                <Text style={styles.categoryName}>{pkg.name}</Text>
+                <Text style={styles.categoryPrice}>{pkg.price}</Text>
+              </View>
+              <View style={styles.progressTrack}>
+                <View style={[styles.progressFill, { width: pkg.progress, backgroundColor: pkg.color }]} />
+              </View>
             </View>
-          </View>
-        </TouchableOpacity>
-      ))}
-      <View style={{ height: 100 }} />
+          </TouchableOpacity>
+        ))
+      ) : (
+        <Text style={{ color: '#6B7280', textAlign: 'center', marginTop: 10 }}>Идэвхтэй багц одоогоор байхгүй байна.</Text>
+      )}
     </ScrollView>
   );
 };

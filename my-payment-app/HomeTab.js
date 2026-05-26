@@ -1,4 +1,5 @@
 import { Feather } from '@expo/vector-icons';
+import React, { useMemo } from 'react';
 import { RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { styles } from './styles';
 
@@ -24,6 +25,14 @@ const ServiceTile = ({ icon, color, title, onPress }) => (
   </TouchableOpacity>
 );
 
+const promoPackages = [
+  { id: 'p1', type: 'data', gb: 1, price: 1000, title: '1GB / 24 Цаг', color: '#10B981', icon: 'wifi' },
+  { id: 'p2', type: 'data', gb: 5, price: 4500, title: '5GB / 7 Хоног', color: '#3B82F6', icon: 'wifi' },
+  { id: 'p3', type: 'unit', amount: 5000, price: 5000, title: '5,000 Нэгж', color: '#F59E0B', icon: 'zap' },
+  { id: 'p4', type: 'unit', amount: 10000, price: 10000, title: '10,000 Нэгж', color: '#EC4899', icon: 'zap' },
+  { id: 'p5', type: 'data', gb: 15, price: 15000, title: '15GB / 30 Хоног', color: '#8B5CF6', icon: 'wifi' },
+];
+
 const HomeTab = ({ 
   T, 
   userName,
@@ -35,11 +44,17 @@ const HomeTab = ({
   setCurrentTab, 
   setIsSearching, 
   setShowNotifications,
+  setShowAllServices,
   setCustomAlert,
   handleSelectPackage,
   refreshing,
   onRefresh
 }) => {
+  const randomPromos = useMemo(() => {
+    // Санамсаргүйгээр хольж, эхний 3-ыг харуулна
+    return [...promoPackages].sort(() => 0.5 - Math.random()).slice(0, 3);
+  }, []);
+
   return (
     <View style={{ flex: 1, backgroundColor: '#0F0F14' }}>
       {/* Хөдөлгөөнгүй байх толгой хэсэг */}
@@ -67,6 +82,7 @@ const HomeTab = ({
       <ScrollView 
         showsVerticalScrollIndicator={false} 
         style={styles.scrollArea}
+        contentContainerStyle={{ paddingBottom: 160 }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FFF" />
         }>
@@ -131,12 +147,44 @@ const HomeTab = ({
           </View>
           <Text style={{ color: '#9CA3AF', fontSize: 12, marginTop: 8 }}>{T.home.buyUnits}</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={{ alignItems: 'center', flex: 1 }} onPress={() => setActiveAction('more')}>
+        <TouchableOpacity style={{ alignItems: 'center', flex: 1 }} onPress={() => setShowAllServices(true)}>
           <View style={[styles.actionBtn, { backgroundColor: '#1F2937', width: 56, height: 56, borderRadius: 18, justifyContent: 'center', alignItems: 'center' }]}>
             <Feather name="grid" size={24} color="#8B5CF6" />
           </View>
           <Text style={{ color: '#9CA3AF', fontSize: 12, marginTop: 8 }}>{T.home.more}</Text>
         </TouchableOpacity>
+      </View>
+
+      {/* Танд зориулсан багцууд (Horizontal Promo Cards) */}
+      <View style={styles.promoContainer}>
+        <View style={[styles.sectionHeader, { paddingHorizontal: 20 }]}>
+          <Text style={styles.sectionTitle}>{T.home.specialOffers}</Text>
+        </View>
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false} 
+          contentContainerStyle={styles.promoScroll}
+        >
+          {randomPromos.map((pkg) => (
+            <TouchableOpacity 
+              key={pkg.id} 
+              style={[styles.promoCard, { backgroundColor: pkg.color + '15', borderColor: pkg.color + '30' }]}
+              onPress={() => {
+                if (pkg.type === 'data') {
+                  handleSelectPackage(pkg.gb, pkg.price);
+                } else {
+                  setActiveAction('unit');
+                }
+              }}
+            >
+              <View style={[styles.promoIconContainer, { backgroundColor: pkg.color + '20' }]}>
+                <Feather name={pkg.icon} size={18} color={pkg.color} />
+              </View>
+              <Text style={styles.promoTitle}>{pkg.title}</Text>
+              <Text style={styles.promoPrice}>₮{pkg.price.toLocaleString()}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
       </View>
 
       <View style={styles.sectionHeader}>
@@ -147,43 +195,10 @@ const HomeTab = ({
         <ServiceTile icon="file-text" color="#3B82F6" title="Төлбөр" onPress={() => setCurrentTab('billing')} />
         <ServiceTile icon="wifi" color="#10B981" title="Дата" onPress={() => setActiveAction('data')} />
         <ServiceTile icon="zap" color="#F59E0B" title="Нэгж" onPress={() => setActiveAction('unit')} />
-        <ServiceTile icon="smartphone" color="#EC4899" title="Роуминг" onPress={() => setCustomAlert({ visible: true, message: "Олон улсын роуминг үйлчилгээ тун удахгүй." })} />
       </View>
-
-      <Text style={styles.sectionTitleInternal}>{T.home.needed}</Text>
-      <TouchableOpacity style={styles.assetCard} onPress={() => setCustomAlert({ visible: true, message: "Гар утасны даатгал үйлчилгээ удахгүй нээгдэнэ." })}>
-        <View style={styles.assetLeft}>
-          <View style={[styles.assetIcon, { backgroundColor: '#8B5CF6' }]}>
-            <Feather name="shield" size={20} color="#FFF" />
-          </View>
-          <View><Text style={styles.assetName}>{T.home.insurance}</Text><Text style={styles.assetSub}>{T.home.insuranceSub}</Text></View>
-        </View>
-        <Feather name="plus" size={20} color="#6B7280" />
-      </TouchableOpacity>
-
-      <TouchableOpacity style={styles.assetCard} onPress={() => setCustomAlert({ visible: true, message: "Зээлийн үйлчилгээ тун удахгүй нээгдэнэ." })}>
-        <View style={styles.assetLeft}>
-          <View style={[styles.assetIcon, { backgroundColor: '#10B981' }]}>
-            <Feather name="dollar-sign" size={20} color="#FFF" />
-          </View>
-          <View><Text style={styles.assetName}>{T.home.loan}</Text><Text style={styles.assetSub}>{T.home.loanSub}</Text></View>
-        </View>
-        <Feather name="chevron-right" size={20} color="#6B7280" />
-      </TouchableOpacity>
-
-      <TouchableOpacity style={styles.assetCard} onPress={() => setCustomAlert({ visible: true, message: "Таны цуглуулсан оноо: 1,250" })}>
-        <View style={styles.assetLeft}>
-          <View style={[styles.assetIcon, { backgroundColor: '#F59E0B' }]}>
-            <Feather name="star" size={20} color="#FFF" />
-          </View>
-          <View><Text style={styles.assetName}>{T.home.loyalty}</Text><Text style={styles.assetSub}>{T.home.loyaltySub}</Text></View>
-        </View>
-        <Feather name="chevron-right" size={20} color="#6B7280" />
-      </TouchableOpacity>
 
         </View>
       </ScrollView>
-      <View style={{ height: 100 }} />
     </View>
   );
 };

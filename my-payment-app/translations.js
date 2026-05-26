@@ -13,15 +13,9 @@ export const translations = {
       payBill: 'Төлбөр төлөх',
       dataPkg: 'Дата багц',
       buyUnits: 'Нэгж авах',
+      specialOffers: 'Танд зориулсан багцууд',
       more: 'Бусад',
       services: 'Үйлчилгээ',
-      needed: 'Танд хэрэгтэй',
-      insurance: 'Утасны даатгал',
-      insuranceSub: 'Гэнэтийн эрсдэлээс хамгаална',
-      loan: 'Зээлийн үйлчилгээ',
-      loanSub: 'Хэрэгцээндээ тохируулан зээл авах',
-      loyalty: 'Лояалти оноо',
-      loyaltySub: 'Хэрэглээ бүрээсээ оноо цуглуул'
     },
     overview: {
       title: 'Миний хэрэглээ',
@@ -76,15 +70,9 @@ export const translations = {
       payBill: 'Pay Bill',
       dataPkg: 'Data Pack',
       buyUnits: 'Buy Units',
+      specialOffers: 'Special Offers',
       more: 'More',
       services: 'Services',
-      needed: 'Needed for you',
-      insurance: 'Phone Insurance',
-      insuranceSub: 'Protect from unexpected risks',
-      loan: 'Credit Service',
-      loanSub: 'Get a loan based on your needs',
-      loyalty: 'Loyalty Points',
-      loyaltySub: 'Collect points from every usage'
     },
     overview: {
       title: 'My Usage',
