@@ -1,5 +1,5 @@
 import { Feather } from '@expo/vector-icons';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Dimensions,
@@ -15,47 +15,37 @@ import { supabase } from './supabase';
 
 const { height } = Dimensions.get('window');
 
-interface DataPackage {
-  id: string;
-  gb: number;
-  price: number;
-  name: string;
-}
-
 interface TransferModalProps {
   visible: boolean;
   onClose: () => void;
   T: any;
   isProcessing: boolean;
   error: string | null;
-  handleTransfer: (data: { method: 'phone' | 'account' | null; target: string; type: 'money' | 'unit' | 'data'; value: string | DataPackage }) => Promise<boolean>;
+  handleTransfer: (data: { method: 'phone' | 'account' | null; target: string; type: 'money' | 'unit'; value: string }) => Promise<boolean>;
 }
-
-const dataPackages: DataPackage[] = [
-  { id: 'd1', gb: 1, price: 1000, name: '1GB Багц' },
-  { id: 'd2', gb: 3, price: 2500, name: '3GB Багц' },
-  { id: 'd3', gb: 5, price: 4500, name: '5GB Багц' },
-];
 
 const TransferModal: React.FC<TransferModalProps> = ({ 
   visible, 
   onClose, 
   handleTransfer,
-  isProcessing,
+  isProcessing: isConfirming,
   error,
 }) => {
   const [step, setStep] = useState(1); // 1: Method, 2: Target, 3: Amount/Type
   const [method, setMethod] = useState<'phone' | 'account' | null>(null);
   const [target, setTarget] = useState('');
-  const [type, setType] = useState<'money' | 'unit' | 'data'>('money'); // 'money', 'unit', 'data'
+  const [type, setType] = useState<'money' | 'unit'>('money'); // 'money', 'unit'
   const [amount, setAmount] = useState('');
   const [recipientInfo, setRecipientInfo] = useState<{ name: string } | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
   const [verifyError, setVerifyError] = useState('');
 
-  if (!visible) return null;
+  // Reset state when modal becomes visible
+  useEffect(() => {
+    if (visible) resetAndClose(false); // Pass false to prevent closing
+  }, [visible]);
 
-  const resetAndClose = () => {
+  const resetAndClose = (shouldClose = true) => {
     setStep(1);
     setMethod(null);
     setTarget('');
@@ -64,7 +54,7 @@ const TransferModal: React.FC<TransferModalProps> = ({
     setRecipientInfo(null);
     setVerifyError('');
     setIsVerifying(false);
-    onClose();
+    if (shouldClose) onClose();
   };
 
   const handleVerifyRecipient = async () => {
@@ -76,7 +66,7 @@ const TransferModal: React.FC<TransferModalProps> = ({
     setVerifyError('');
     setRecipientInfo(null);
 
-    const { data, error } = await supabase.rpc('get_user_by_phone', { phone_number: target }).single() as { data: { id: string, full_name: string } | null, error: any };
+    const { data, error } = await supabase.rpc('get_user_by_phone', { phone_number: target }).single();
 
     if (error || !data || !(data as any).full_name) {
       setVerifyError("Уучлаарай, энэ дугаар бүртгэлгүй байна.");
@@ -86,28 +76,28 @@ const TransferModal: React.FC<TransferModalProps> = ({
     setIsVerifying(false);
   };
 
-  const handleConfirm = async (dataPkg: DataPackage | null = null) => {
+  const handleConfirm = async () => {
     const success = await handleTransfer({
       method,
       target,
-      type: (dataPkg ? 'data' : type) as 'money' | 'unit' | 'data',
-      value: dataPkg || amount
+      type: type,
+      value: amount
     });
     if (success) resetAndClose();
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent={true} onRequestClose={resetAndClose}>
+    <Modal visible={visible} animationType="slide" transparent={true} onRequestClose={() => resetAndClose()}>
       <View style={localStyles.overlay}>
         <View style={localStyles.container}>
           <View style={localStyles.header}>
             <Text style={localStyles.title}>Шилжүүлэг хийх</Text>
-            <TouchableOpacity onPress={resetAndClose} style={localStyles.closeBtn}>
+            <TouchableOpacity onPress={() => resetAndClose()} style={localStyles.closeBtn}>
               <Feather name="x" size={20} color="#FFF" />
             </TouchableOpacity>
           </View>
 
-          {isProcessing || isVerifying ? (
+          {isConfirming || isVerifying ? (
             <View style={localStyles.center}>
               <ActivityIndicator size="large" color="#7C3AED" />
               <Text style={{ color: '#9CA3AF', marginTop: 12 }}>Боловсруулж байна...</Text>
@@ -124,13 +114,13 @@ const TransferModal: React.FC<TransferModalProps> = ({
                       <Text style={localStyles.optionSub}>Мөнгө, нэгж, дата шилжүүлэх</Text>
                     </View>
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={() => { setMethod('account'); setStep(2); }} style={localStyles.option}>
+                  <View style={[localStyles.option, { opacity: 0.4 }]}>
                     <Feather name="credit-card" size={24} color="#3B82F6" />
                     <View style={{ marginLeft: 16 }}>
                       <Text style={localStyles.optionTitle}>Дансны дугаар руу</Text>
-                      <Text style={localStyles.optionSub}>Зөвхөн мөнгө шилжүүлэх</Text>
+                      <Text style={localStyles.optionSub}>Тун удахгүй...</Text>
                     </View>
-                  </TouchableOpacity>
+                  </View>
                 </View>
               )}
 
@@ -144,7 +134,7 @@ const TransferModal: React.FC<TransferModalProps> = ({
                     keyboardType="numeric"
                     value={target}
                     onChangeText={setTarget}
-                    maxLength={method === 'phone' ? 8 : undefined}
+                    maxLength={8}
                   />
                   {isVerifying ? (
                     <ActivityIndicator color="#7C3AED" style={{ marginVertical: 16 }} />
@@ -159,7 +149,7 @@ const TransferModal: React.FC<TransferModalProps> = ({
                       </TouchableOpacity>
                     </View>
                   ) : (
-                    <TouchableOpacity onPress={handleVerifyRecipient} disabled={target.length !== 8} style={[localStyles.mainBtn, target.length !== 8 && { opacity: 0.5 }]}>
+                    <TouchableOpacity onPress={handleVerifyRecipient} disabled={target.length !== 8} style={[localStyles.mainBtn, target.length !== 8 && { opacity: 0.6 }]}>
                       <Text style={localStyles.btnText}>Шалгах</Text>
                     </TouchableOpacity>
                   )}
@@ -181,38 +171,22 @@ const TransferModal: React.FC<TransferModalProps> = ({
                     <>
                       <Text style={localStyles.label}>Шилжүүлэх төрөл</Text>
                       <View style={localStyles.chipRow}>
-                        {(['money', 'unit', 'data'] as const).map(t => (
+                        {(['money', 'unit'] as const).map(t => (
                           <TouchableOpacity key={t} onPress={() => setType(t)} style={[localStyles.chip, type === t && localStyles.activeChip]}>
-                            <Text style={{ color: '#FFF', textTransform: 'capitalize' }}>{t === 'money' ? 'Мөнгө' : t === 'unit' ? 'Нэгж' : 'Дата'}</Text>
+                            <Text style={{ color: '#FFF', textTransform: 'capitalize' }}>{t === 'money' ? 'Мөнгө' : 'Нэгж'}</Text>
                           </TouchableOpacity>
                         ))}
                       </View>
                     </>
                   ) : null}
 
-                  {type === 'data' && method === 'phone' ? (
-                    dataPackages.map((pkg) => (
-                      <TouchableOpacity key={pkg.id} onPress={() => handleConfirm(pkg)} style={localStyles.pkgItem}>
-                        <View><Text style={localStyles.pkgName}>{pkg.name}</Text><Text style={localStyles.pkgPrice}>₮{pkg.price.toLocaleString()}</Text></View>
-                        <Feather name="send" size={18} color="#7C3AED" />
-                      </TouchableOpacity>
-                    ))
-                  ) : (
-                    <View>
-                      <Text style={localStyles.label}>Шилжүүлэх дүн</Text>
-                      <TextInput
-                        style={localStyles.input}
-                        placeholder="0"
-                        placeholderTextColor="#4B5563"
-                        keyboardType="numeric"
-                        value={amount}
-                        onChangeText={setAmount}
-                      />
-                      <TouchableOpacity onPress={() => handleConfirm()} style={localStyles.mainBtn}>
-                        <Text style={localStyles.btnText}>Шилжүүлэх</Text>
-                      </TouchableOpacity>
-                    </View>
-                  )}
+                  <View>
+                    <Text style={localStyles.label}>Шилжүүлэх дүн</Text>
+                    <TextInput style={localStyles.input} placeholder="0" placeholderTextColor="#4B5563" keyboardType="numeric" value={amount} onChangeText={setAmount} />
+                    <TouchableOpacity onPress={() => handleConfirm()} style={localStyles.mainBtn}>
+                      <Text style={localStyles.btnText}>Шилжүүлэх</Text>
+                    </TouchableOpacity>
+                  </View>
                   <TouchableOpacity onPress={() => setStep(2)} style={localStyles.backBtn}><Text style={{ color: '#9CA3AF' }}>Буцах</Text></TouchableOpacity>
                 </View>
               )}

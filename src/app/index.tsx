@@ -7,6 +7,7 @@ import {
   ScrollView,
   StatusBar,
   Text,
+  TextInput,
   TouchableOpacity,
   View
 } from 'react-native';
@@ -92,6 +93,7 @@ export default function Index() {
     handleLogout, 
     handleBiometricLogin,
     canUseBiometric,
+    clearBiometricCredentials,
     isProcessing, 
     authError 
   } = useAuth();
@@ -112,7 +114,7 @@ export default function Index() {
   } = useUserProfile(user);
 
   // --- TRANSFER LOGIC (useTransfer hook-оос авна) ---
-  const { isTransferring, transferError, handleTransfer, setTransferError } = useTransfer(user);
+  const { isTransferring, transferError, handleTransfer, setTransferError } = useTransfer(user, mainBalance, setMainBalance);
 
   const [appLanguage, setAppLanguage] = useState('MN');
   const T = (translations as any)[appLanguage] || (translations as any)['MN'];
@@ -143,6 +145,7 @@ export default function Index() {
     visible: boolean;
     message: string;
     buttons?: { text: string; style?: 'cancel' | 'default'; onPress: () => void }[];
+    onClose?: () => void;
   }>({ visible: false, message: '' });
   
   const [inputDialog, setInputDialog] = useState({
@@ -150,6 +153,7 @@ export default function Index() {
     title: '',
     placeholder: '',
     secureTextEntry: false,
+    inputValue: '',
     onConfirm: (text: string) => {},
   });
 
@@ -165,8 +169,8 @@ export default function Index() {
   const [topUpAmount, setTopUpAmount] = useState('');
   const [selectedBank, setSelectedBank] = useState(null);
   const [cardNumber, setCardNumber] = useState('');
+  const [showProfileActionsModal, setShowProfileActionsModal] = useState(false);
   const [autoPayEnabled, setAutoPayEnabled] = useState(true);
-  const [biometricsEnabled, setBiometricsEnabled] = useState(false);
 
   // App.js-ээс нэмэгдсэн хайлтын логик
   const handleSearchAction = (actionFn: () => void, query: string) => {
@@ -197,19 +201,20 @@ export default function Index() {
     { id: 'xac', name: 'Хас банк', color: '#EC4899' },
   ];
 
-  const [toast, setToast] = useState({ visible: false, title: '', desc: '', icon: '' as any, color: '' });
+  const [toast, setToast] = useState({ visible: false, title: '', desc: '', icon: '' as any, color: '', family: 'feather' as 'feather' | 'material' });
 
-  const addNotification = (title: string, desc: string, icon: any = 'info', color: string = '#3B82F6') => {
+  const addNotification = (title: string, desc: string, icon: any = 'info', color: string = '#3B82F6', family: 'feather' | 'material' = 'feather') => {
     const newNote = {
       id: Date.now(),
       title,
       desc,
       time: 'Дөнгөж сая',
       icon,
-      color
+      color,
+      family
     };
     setNotificationList(prev => [newNote, ...prev]);
-    setToast({ visible: true, title, desc, icon, color });
+    setToast({ visible: true, title, desc, icon, color, family });
   };
 
   useEffect(() => {
@@ -437,8 +442,8 @@ export default function Index() {
   const handleTransferWithNotification = async (data: any) => {
     const success = await handleTransfer(data);
     if (success) {
-      const typeLabel = data.type === 'money' ? '₮' : (data.type === 'unit' ? ' нэгж' : ' дата');
-      const valueDisplay = data.type === 'data' ? data.value.name : `${data.value.toLocaleString()}${typeLabel}`;
+      const typeLabel = data.type === 'money' ? '₮' : ' нэгж';
+      const valueDisplay = `${data.value.toLocaleString()}${typeLabel}`;
       
       addNotification(
         'Шилжүүлэг амжилттай', 
@@ -481,28 +486,39 @@ export default function Index() {
 
   // --- ҮЙЛЧИЛГЭЭНИЙ ТӨРӨЛ СОЛИХ ---
   const handleServiceTypeChange = async (newType: 'prepaid' | 'postpaid') => {
-    if (!user || serviceType === newType) return;
+    if (!user || serviceType === newType) return; // Хэрэв ижил төрөл дээр дарвал юу ч хийхгүй
 
-    const previousType = serviceType;
-    setServiceType(newType); // UI-г шууд шинэчлэх
+    const newTypeName = newType === 'prepaid' ? 'Урьдчилсан' : 'Дараа';
+    setCustomAlert({
+      visible: true,
+      message: `Та үйлчилгээний төрлөө "${newTypeName} төлбөрт" болгон солихдоо итгэлтэй байна уу?`,
+      buttons: [
+        { text: "Цуцлах", style: "cancel", onPress: () => setCustomAlert({ visible: false, message: '' }) },
+        {
+          text: "Тийм",
+          onPress: async () => {
+            setCustomAlert({ visible: false, message: '' }); // Alert-г хаах
+            const { error } = await supabase
+              .from('profiles')
+              .update({ service_type: newType })
+              .eq('id', user.id);
 
-    const { error } = await supabase
-      .from('profiles')
-      .update({ service_type: newType })
-      .eq('id', user.id);
-
-    if (error) {
-      console.error('Error updating service type:', error);
-      setCustomAlert({ visible: true, message: 'Үйлчилгээний төрөл солиход алдаа гарлаа: ' + error.message });
-      setServiceType(previousType as 'prepaid' | 'postpaid'); // Алдаа гарвал өмнөх төлөв рүү буцаана
-    } else {
-      addNotification(
-        'Амжилттай', 
-        `Үйлчилгээний төрөл ${newType === 'prepaid' ? 'Урьдчилсан' : 'Дараа'} төлбөрт болж шинэчлэгдлээ.`, 
-        'check-circle', 
-        '#10B981'
-      );
-    }
+            if (error) {
+              console.error('Error updating service type:', error);
+              setCustomAlert({ visible: true, message: 'Үйлчилгээний төрөл солиход алдаа гарлаа: ' + error.message });
+            } else {
+              setServiceType(newType); // Амжилттай бол UI-г шинэчлэх
+              addNotification(
+                'Амжилттай', 
+                `Үйлчилгээний төрөл ${newTypeName} төлбөрт болж шинэчлэгдлээ.`, 
+                'check-circle', 
+                '#10B981'
+              );
+            }
+          }
+        }
+      ]
+    });
   };
 
   // --- PULL TO REFRESH LOGIC ---
@@ -540,13 +556,17 @@ export default function Index() {
       <Animated.View style={[styles.bgBlob3, blob3Style]} />
 
       {toast.visible && (
-        <TouchableOpacity 
+        <TouchableOpacity
           activeOpacity={0.9}
           onPress={() => setToast({ ...toast, visible: false })}
           style={styles.toastContainer}
         >
           <View style={[styles.toastIconBg, { backgroundColor: toast.color + '20' }]}>
-            <Feather name={toast.icon} size={20} color={toast.color} />
+            {toast.family === 'material' ? (
+              <MaterialCommunityIcons name={toast.icon} size={20} color={toast.color} />
+            ) : (
+              <Feather name={toast.icon} size={20} color={toast.color} />
+            )}
           </View>
           <View style={{ marginLeft: 12, flex: 1 }}>
             <Text style={styles.toastTitle}>{toast.title}</Text>
@@ -562,8 +582,30 @@ export default function Index() {
             authPhone={authPhone} setAuthPhone={setAuthPhone} 
             authPass={authPass} setAuthPass={setAuthPass} 
             authMode={authMode} setAuthMode={setAuthMode} 
-            handleAuth={handleAuth} 
-            isProcessing={isProcessing}
+            isProcessing={isProcessing} // This prop is incorrect, handleAuth is a function. Let's fix this.
+            // The handleAuth function now needs a callback to show the prompt.
+            // We will wrap the original handleAuth from the hook.
+            onAuthRequest={() => {
+              handleAuth((onConfirm) => {
+                setCustomAlert({
+                  visible: true,
+                  message: 'Дараагийн удаа хурууны хээ/царайгаар нэвтрэх үү?',
+                  buttons: [
+                    { text: 'Үгүй', style: 'cancel', onPress: () => {
+                        clearBiometricCredentials();
+                        setCustomAlert({ visible: false, message: '' });
+                      } 
+                    },
+                    { text: 'Тийм', onPress: () => {
+                        onConfirm();
+                        setCustomAlert({ visible: false, message: '' });
+                        addNotification('Биометрик хадгаллаа', 'Дараагийн нэвтрэлтээс ашиглах боломжтой.', 'fingerprint', '#7C3AED', 'material');
+                      } 
+                    }
+                  ]
+                })
+              });
+            }}
             authError={authError}
             canUseBiometric={canUseBiometric}
             handleBiometricLogin={handleBiometricLogin}
@@ -620,13 +662,19 @@ export default function Index() {
                 userName={userName} 
                 userPhone={authPhone} 
                 addNotification={addNotification} 
-                setCustomAlert={setCustomAlert} 
-                biometricsEnabled={biometricsEnabled} setBiometricsEnabled={setBiometricsEnabled} 
+                setCustomAlert={setCustomAlert}
+                biometricsEnabled={canUseBiometric} // Use state from useAuth hook
+                setBiometricsEnabled={(enabled: boolean) => {
+                  if (!enabled) {
+                    // If user turns it off, call logout to clear credentials
+                    handleLogout();
+                  }
+                }}
                 appLanguage={appLanguage} setAppLanguage={setAppLanguage} 
                 setActiveAction={setActiveAction} 
                 setShowAIChat={setShowAIChat} 
-                handleLogout={handleLogout} 
-                openInputDialog={setInputDialog} handleUpdateName={handleUpdateName} handleUpdatePassword={handleUpdatePassword} />
+                handleLogout={handleLogout}
+                setShowProfileActionsModal={setShowProfileActionsModal} />
             )}
 
             {/* Bottom Navigation */}
@@ -664,6 +712,63 @@ export default function Index() {
           buttons={customAlert.buttons || []}
         />
         <AiChatModal visible={showAIChat} onClose={() => setShowAIChat(false)} chatMessages={chatMessages} chatInput={chatInput} setChatInput={setChatInput} onSendMessage={handleSendMessage} />
+
+        {/* Input Dialog - Нэр, нууц үг солих */}
+        <Modal
+          visible={inputDialog.visible}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setInputDialog({ ...inputDialog, visible: false })}
+        >
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.6)' }}>
+            <View style={{ width: '85%', backgroundColor: '#1C1C24', borderRadius: 20, padding: 24, borderWidth: 1, borderColor: '#2D2D3A' }}>
+              <Text style={{ color: '#FFF', fontSize: 18, fontWeight: 'bold', marginBottom: 16 }}>{inputDialog.title}</Text>
+              <TextInput
+                style={{ backgroundColor: '#15151D', borderRadius: 12, padding: 14, color: '#FFF', fontSize: 16, borderWidth: 1, borderColor: '#374151', marginBottom: 20 }}
+                placeholder={inputDialog.placeholder}
+                placeholderTextColor="#6B7280"
+                secureTextEntry={inputDialog.secureTextEntry}
+                value={inputDialog.inputValue}
+                onChangeText={(text) => setInputDialog(prev => ({ ...prev, inputValue: text }))}
+                autoFocus
+              />
+              <View style={{ flexDirection: 'row', gap: 12 }}>
+                <TouchableOpacity onPress={() => setInputDialog({ ...inputDialog, visible: false, inputValue: '' })} style={{ flex: 1, backgroundColor: '#374151', padding: 14, borderRadius: 12, alignItems: 'center' }}>
+                  <Text style={{ color: '#FFF', fontWeight: 'bold' }}>Цуцлах</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => {
+                  inputDialog.onConfirm(inputDialog.inputValue);
+                  setInputDialog({ ...inputDialog, visible: false, inputValue: '' });
+                }} style={{ flex: 1, backgroundColor: '#7C3AED', padding: 14, borderRadius: 12, alignItems: 'center' }}>
+                  <Text style={{ color: '#FFF', fontWeight: 'bold' }}>Хадгалах</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Profile Actions Modal */}
+        <Modal
+          visible={showProfileActionsModal}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowProfileActionsModal(false)}
+        >
+          <TouchableOpacity style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.6)' }} activeOpacity={1} onPressOut={() => setShowProfileActionsModal(false)}>
+            <View style={{ width: '85%', backgroundColor: '#1C1C24', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: '#2D2D3A' }}>
+              <TouchableOpacity onPress={() => { setShowProfileActionsModal(false); setInputDialog({ visible: true, title: 'Нэр солих', placeholder: 'Шинэ нэрээ оруулна уу', onConfirm: handleUpdateName, inputValue: '', secureTextEntry: false }); }} style={{ flexDirection: 'row', alignItems: 'center', padding: 14 }}>
+                <Feather name="user" size={20} color="#A5B4FC" style={{ marginRight: 16 }} />
+                <Text style={{ color: '#FFF', fontSize: 16, fontWeight: '500' }}>Нэр солих</Text>
+              </TouchableOpacity>
+              <View style={{ height: 1, backgroundColor: '#2D2D3A', marginHorizontal: 14 }} />
+              <TouchableOpacity onPress={() => { setShowProfileActionsModal(false); setInputDialog({ visible: true, title: 'Нууц үг солих', placeholder: 'Шинэ нууц үгээ оруулна уу', secureTextEntry: true, onConfirm: handleUpdatePassword, inputValue: '' }); }} style={{ flexDirection: 'row', alignItems: 'center', padding: 14 }}>
+                <Feather name="key" size={20} color="#F9A8D4" style={{ marginRight: 16 }} />
+                <Text style={{ color: '#FFF', fontSize: 16, fontWeight: '500' }}>Нууц үг солих</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+
         <DataActionModal visible={activeAction === 'data'} onClose={() => { setActiveAction(null); setShowPayment(false); }} showPayment={showPayment} selectedDataPkg={selectedDataPkg} unitBalance={unitBalance} handleSelectPackage={handleSelectPackage} handlePaymentConfirm={handlePaymentConfirm} />
         <UnitActionModal visible={activeAction === 'unit'} onClose={() => setActiveAction(null)} mainBalance={mainBalance} handleUnitCardPurchase={handleUnitCardPurchase} />
         <TopUpActionModal 
@@ -699,8 +804,12 @@ export default function Index() {
               <ScrollView showsVerticalScrollIndicator={false}>
                 {notificationList.map(note => (
                   <View key={note.id} style={{ flexDirection: 'row', padding: 16, backgroundColor: '#1C1C24', borderRadius: 20, marginBottom: 12, borderWidth: 1, borderColor: '#2D2D3A' }}>
-                    <View style={{ width: 48, height: 48, borderRadius: 14, backgroundColor: note.color + '15', justifyContent: 'center', alignItems: 'center' }}>
-                      <Feather name={note.icon} size={22} color={note.color} />
+                    <View style={{ width: 48, height: 48, borderRadius: 14, backgroundColor: (note as any).color + '15', justifyContent: 'center', alignItems: 'center' }}>
+                      {(note as any).family === 'material' ? (
+                        <MaterialCommunityIcons name={(note as any).icon} size={22} color={(note as any).color} />
+                      ) : (
+                        <Feather name={(note as any).icon || 'arrow-up-right'} size={22} color={(note as any).color} />
+                      )}
                     </View>
                     <View style={{ flex: 1, marginLeft: 16 }}>
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>

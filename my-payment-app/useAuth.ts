@@ -33,6 +33,12 @@ export const useAuth = () => {
       const savedPass = await SecureStore.getItemAsync('user_pass');
       const hasHardware = await LocalAuthentication.hasHardwareAsync();
       setCanUseBiometric(!!(savedPhone && savedPass && hasHardware));
+
+      // Хамгийн сүүлд нэвтэрсэн дугаарыг ачааллах
+      const lastLoginPhone = await SecureStore.getItemAsync('last_login_phone');
+      if (lastLoginPhone) {
+        setAuthPhone(lastLoginPhone);
+      }
     };
 
     fetchSession();
@@ -72,6 +78,7 @@ export const useAuth = () => {
             email: `${phone}@xpay.mn`,
             password: pass,
           });
+          await SecureStore.setItemAsync('last_login_phone', phone); // Дугаарыг хадгалах
           if (error) throw error;
         } else {
           setAuthError('Хадгалагдсан мэдээлэл олдсонгүй.');
@@ -85,7 +92,11 @@ export const useAuth = () => {
     }
   };
 
-  const handleAuth = async () => {
+  const handleAuth = async (
+    // Add a callback to ask the user if they want to save biometrics
+    // This will be triggered from the UI component (index.tsx)
+    promptToSaveBiometrics: (onConfirm: () => void) => void
+  ) => {
     if (!authPhone || !authPass || (authMode === 'register' && !authName)) {
       setAuthError('Мэдээллээ бүрэн оруулна уу.');
       return;
@@ -119,13 +130,20 @@ export const useAuth = () => {
       const { error, data } = response;
       if (error) throw error;
 
-      // Биометрик мэдээллийг хадгалах
+      // Ask to save biometric info instead of saving automatically
       if (data.user) {
+        // Нэвтрэлт амжилттай болбол дугаарыг хадгалах
+        await SecureStore.setItemAsync('last_login_phone', authPhone);
+
         const hasHardware = await LocalAuthentication.hasHardwareAsync();
         const isEnrolled = await LocalAuthentication.isEnrolledAsync();
         if (hasHardware && isEnrolled) {
+          // Call the prompt function passed from the UI
+          promptToSaveBiometrics(async () => {
             await SecureStore.setItemAsync('user_phone', authPhone);
             await SecureStore.setItemAsync('user_pass', authPass);
+            setCanUseBiometric(true); // Update state immediately
+          });
         }
       }
 
@@ -147,6 +165,13 @@ export const useAuth = () => {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
+  };
+
+  const clearBiometricCredentials = async () => {
+    // Clear saved credentials
+    await SecureStore.deleteItemAsync('user_phone');
+    await SecureStore.deleteItemAsync('user_pass');
+    setCanUseBiometric(false);
   };
 
   return {
@@ -171,6 +196,7 @@ export const useAuth = () => {
     handleAuth,
     handleLogout,
     handleBiometricLogin,
+    clearBiometricCredentials,
     canUseBiometric,
     setCanUseBiometric,
   };

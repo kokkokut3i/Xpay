@@ -2,7 +2,7 @@ import { Feather } from '@expo/vector-icons';
 import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { styles } from './styles';
 
-const SettingsTab = ({ T, userName, userPhone, addNotification, setCustomAlert, biometricsEnabled, setBiometricsEnabled, appLanguage, setAppLanguage, setActiveAction, setShowAIChat, handleLogout, openInputDialog, handleUpdateName, handleUpdatePassword }) => {
+const SettingsTab = ({ T, userName, userPhone, addNotification, setCustomAlert, biometricsEnabled, setBiometricsEnabled, appLanguage, setAppLanguage, setActiveAction, setShowAIChat, handleLogout, setShowProfileActionsModal }) => {
   return (
     <ScrollView showsVerticalScrollIndicator={false} style={styles.scrollArea}>
       <View style={styles.header}>
@@ -17,7 +17,7 @@ const SettingsTab = ({ T, userName, userPhone, addNotification, setCustomAlert, 
 
       {/* Профайл карт */}
       <TouchableOpacity 
-        onPress={() => setCustomAlert({ visible: true, message: "Таны хэрэглэгчийн түвшин: АЛТАН ГИШҮҮН ⭐" })}
+        onPress={() => setShowProfileActionsModal(true)}
         style={{ backgroundColor: '#1C1C24', padding: 20, borderRadius: 24, flexDirection: 'row', alignItems: 'center', marginBottom: 24, borderWidth: 1, borderColor: '#2D2D3A' }}
       >
         <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: '#7C3AED', justifyContent: 'center', alignItems: 'center' }}>
@@ -27,42 +27,8 @@ const SettingsTab = ({ T, userName, userPhone, addNotification, setCustomAlert, 
           <Text style={{ color: '#FFF', fontSize: 20, fontWeight: 'bold' }}>{userName || 'Хэрэглэгч'}</Text>
           <Text style={{ color: '#9CA3AF', fontSize: 14, marginTop: 4 }}>{userPhone} • Алтан гишүүн</Text>
         </View>
-        <Feather name="edit-3" size={18} color="#4B5563" />
+        <Feather name="edit-3" size={18} color="#9CA3AF" />
       </TouchableOpacity>
-
-      {/* Хэрэглэгчийн тохиргоо */}
-      <Text style={styles.sectionTitleInternal}>Хувийн мэдээлэл</Text>
-      <View style={{ backgroundColor: '#1C1C24', borderRadius: 20, marginBottom: 20, borderWidth: 1, borderColor: '#2D2D3A', overflow: 'hidden' }}>
-        <TouchableOpacity 
-          onPress={() => openInputDialog({ 
-            visible: true, 
-            title: 'Нэр солих', 
-            placeholder: 'Шинэ нэрээ оруулна уу', 
-            onConfirm: handleUpdateName
-          })}
-          style={{ flexDirection: 'row', alignItems: 'center', padding: 18, borderBottomWidth: 1, borderBottomColor: '#2D2D3A' }}
-        >
-          <View style={{ backgroundColor: 'rgba(99, 102, 241, 0.1)', padding: 10, borderRadius: 12, marginRight: 16 }}>
-            <Feather name="user" size={20} color="#A5B4FC" />
-          </View>
-          <Text style={{ color: '#FFF', flex: 1, fontSize: 15, fontWeight: '500' }}>Профайл засах</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          onPress={() => openInputDialog({ 
-            visible: true, 
-            title: 'Нууц үг солих', 
-            placeholder: 'Шинэ нууц үгээ оруулна уу', 
-            secureTextEntry: true, 
-            onConfirm: handleUpdatePassword
-          })}
-          style={{ flexDirection: 'row', alignItems: 'center', padding: 18 }}
-        >
-          <View style={{ backgroundColor: 'rgba(236, 72, 153, 0.1)', padding: 10, borderRadius: 12, marginRight: 16 }}>
-            <Feather name="key" size={20} color="#F9A8D4" />
-          </View>
-          <Text style={{ color: '#FFF', flex: 1, fontSize: 15, fontWeight: '500' }}>Нууц үг солих</Text>
-        </TouchableOpacity>
-      </View>
 
       {/* Апп тохиргоо */}
       <Text style={styles.sectionTitleInternal}>Аппликейшн</Text>

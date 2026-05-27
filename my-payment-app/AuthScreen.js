@@ -25,7 +25,7 @@ const AuthScreen = ({
   setAuthPass, 
   authMode, 
   setAuthMode, 
-  handleAuth,
+  onAuthRequest, // Changed from handleAuth to onAuthRequest
   isProcessing, // Шинээр нэмсэн
   authError, // Шинээр нэмсэн
   canUseBiometric, // Шинээр нэмсэн
@@ -138,7 +138,7 @@ const AuthScreen = ({
 
               <View style={{ flexDirection: 'row', gap: 12 }}>
                 <TouchableOpacity 
-                  onPress={handleAuth} 
+                  onPress={onAuthRequest} 
                   disabled={isProcessing} 
                   style={[localStyles.authButton, { flex: 1 }, isProcessing && { opacity: 0.7 }]}
                 >

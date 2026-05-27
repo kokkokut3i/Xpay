@@ -1,22 +1,19 @@
 import { User } from '@supabase/supabase-js';
-import { useState } from 'react';
+import { Dispatch, SetStateAction, useState } from 'react';
 import { supabase } from './supabase';
-
-interface DataPackage {
-  id: string;
-  gb: number;
-  price: number;
-  name: string;
-}
 
 interface TransferParams {
   method: 'phone' | 'account' | null;
   target: string;
-  type: 'money' | 'unit' | 'data';
-  value: string | DataPackage;
+  type: 'money' | 'unit';
+  value: string;
 }
 
-export const useTransfer = (user: User | null) => {
+export const useTransfer = (
+  user: User | null,
+  mainBalance: number,
+  setMainBalance: Dispatch<SetStateAction<number>>
+) => {
   const [isTransferring, setIsTransferring] = useState(false);
   const [transferError, setTransferError] = useState<string | null>(null);
 
@@ -38,7 +35,7 @@ export const useTransfer = (user: User | null) => {
         sender_id: user.id,
         recipient_phone: target,
         transfer_type: type,
-        transfer_value: type === 'data' ? (value as DataPackage).price : parseInt(value as string)
+        transfer_value: parseInt(value as string)
       });
 
       if (error) throw error;
