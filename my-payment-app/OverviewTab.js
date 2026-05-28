@@ -1,4 +1,4 @@
-import { Feather } from '@expo/vector-icons';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { styles } from './styles';
 
@@ -152,7 +152,11 @@ const OverviewTab = ({ T, mainBalance, mainData, unitBalance, activePackage, not
               }}
             >
               <View style={{ backgroundColor: item.color + '15', padding: 10, borderRadius: 14 }}>
-                <Feather name={item.icon || 'arrow-up-right'} size={18} color={item.color} />
+                {item.family === 'material' ? (
+                  <MaterialCommunityIcons name={item.icon} size={18} color={item.color} />
+                ) : (
+                  <Feather name={item.icon || 'arrow-up-right'} size={18} color={item.color} />
+                )}
               </View>
               <View style={{ flex: 1, marginLeft: 16 }}>
                 <Text style={{ color: '#FFF', fontWeight: '600' }}>{item.title}</Text>

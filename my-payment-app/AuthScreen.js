@@ -34,9 +34,22 @@ const AuthScreen = ({
   // Анимацийн утгуудыг тохируулах
   const blob1Anim = useRef(new Animated.Value(0)).current;
   const blob2Anim = useRef(new Animated.Value(0)).current;
+  const blob3Anim = useRef(new Animated.Value(0)).current;
   const errorAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    const animate = (val, duration, delay = 0) => {
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.timing(val, { toValue: 1, duration, useNativeDriver: true }),
+          Animated.timing(val, { toValue: 0, duration, useNativeDriver: true }),
+        ])
+      ).start();
+    };
+    animate(blob1Anim, 12000, 0);
+    animate(blob2Anim, 18000, 1000);
+    animate(blob3Anim, 15000, 2000);
   }, []);
 
   useEffect(() => {
@@ -65,20 +78,30 @@ const AuthScreen = ({
     ],
   };
 
+  const blob3Style = {
+    transform: [
+      { translateX: blob3Anim.interpolate({ inputRange: [0, 1], outputRange: [0, -70] }) },
+      { translateY: blob3Anim.interpolate({ inputRange: [0, 1], outputRange: [0, 100] }) },
+      { scale: blob3Anim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.3] }) },
+    ],
+  };
+
   const toggleMode = () => {
     setAuthMode(authMode === 'login' ? 'register' : 'login');
     setAuthName('');
+    setAuthPhone('');
     setAuthPass('');
   };
 
   return (
     <KeyboardAvoidingView 
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={{ flex: 1, backgroundColor: '#0F0F14' }}
+      style={{ flex: 1, backgroundColor: '#020617' }} // Илүү гүн хар-цэнхэр
     >
-      {/* Хөдөлгөөнт бөмбөлгүүд - Таны санаанаас авсан */}
-      <Animated.View style={[styles.bgBlob1, blob1Style]} />
-      <Animated.View style={[styles.bgBlob2, blob2Style]} />
+      {/* Сайжруулсан хөдөлгөөнт Mesh Gradient суурь */}
+      <Animated.View style={[localStyles.bgBlob, { backgroundColor: '#4C1D95', top: -100, right: -50, opacity: 0.4 }, blob1Style]} />
+      <Animated.View style={[localStyles.bgBlob, { backgroundColor: '#1E1B4B', bottom: -100, left: -50, opacity: 0.6 }, blob2Style]} />
+      <Animated.View style={[localStyles.bgBlob, { backgroundColor: '#701A75', top: '30%', left: '10%', opacity: 0.3 }, blob3Style]} />
 
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 30 }} showsVerticalScrollIndicator={false}>
@@ -173,13 +196,19 @@ const AuthScreen = ({
 };
 
 const localStyles = {
+  bgBlob: {
+    position: 'absolute',
+    width: 350,
+    height: 350,
+    borderRadius: 175,
+  },
   inputGroup: {
-    backgroundColor: '#1C1C24',
+    backgroundColor: 'rgba(30, 30, 45, 0.7)', // Хагас тунгалаг шилэн эффект
     borderRadius: 16,
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#2D2D3A',
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   inputIcon: {
     paddingLeft: 16,

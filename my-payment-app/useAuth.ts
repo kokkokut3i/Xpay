@@ -1,12 +1,12 @@
 import { Session, User } from '@supabase/supabase-js';
 import * as LocalAuthentication from 'expo-local-authentication';
-import * as SecureStore from 'expo-secure-store';
+import { deleteItemAsync, getItemAsync, setItemAsync } from 'expo-secure-store';
 import { useEffect, useState } from 'react';
 import { supabase } from './supabase';
 
 export type AuthMode = 'login' | 'register';
 
-export const useAuth = () => {
+export const useAuth = (T: any) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -29,13 +29,13 @@ export const useAuth = () => {
       setIsLoading(false);
 
       // Хадгалагдсан биометрик мэдээлэл байгаа эсэхийг шалгах
-      const savedPhone = await SecureStore.getItemAsync('user_phone');
-      const savedPass = await SecureStore.getItemAsync('user_pass');
+      const savedPhone = await getItemAsync('user_phone');
+      const savedPass = await getItemAsync('user_pass');
       const hasHardware = await LocalAuthentication.hasHardwareAsync();
       setCanUseBiometric(!!(savedPhone && savedPass && hasHardware));
 
       // Хамгийн сүүлд нэвтэрсэн дугаарыг ачааллах
-      const lastLoginPhone = await SecureStore.getItemAsync('last_login_phone');
+      const lastLoginPhone = await getItemAsync('last_login_phone');
       if (lastLoginPhone) {
         setAuthPhone(lastLoginPhone);
       }
@@ -52,15 +52,15 @@ export const useAuth = () => {
     return () => subscription.unsubscribe();
   }, []);
 
-  const handleBiometricLogin = async () => {
+  const handleBiometricLogin = async (): Promise<boolean> => {
     try {
       const hasHardware = await LocalAuthentication.hasHardwareAsync();
-      if (!hasHardware) return;
+      if (!hasHardware) return false;
 
       const isEnrolled = await LocalAuthentication.isEnrolledAsync();
       if (!isEnrolled) {
-        setAuthError('Биометрик мэдээлэл бүртгэгдээгүй байна.');
-        return;
+        setAuthError(T.auth?.errors?.biometricNotEnrolled || 'Биометрик мэдээлэл бүртгэгдээгүй байна.');
+        return false;
       }
 
       const result = await LocalAuthentication.authenticateAsync({
@@ -70,23 +70,27 @@ export const useAuth = () => {
 
       if (result.success) {
         setIsProcessing(true);
-        const phone = await SecureStore.getItemAsync('user_phone');
-        const pass = await SecureStore.getItemAsync('user_pass');
+        const phone = await getItemAsync('user_phone');
+        const pass = await getItemAsync('user_pass');
 
         if (phone && pass) {
           const { error } = await supabase.auth.signInWithPassword({
             email: `${phone}@xpay.mn`,
             password: pass,
           });
-          await SecureStore.setItemAsync('last_login_phone', phone); // Дугаарыг хадгалах
+          await setItemAsync('last_login_phone', phone); // Дугаарыг хадгалах
           if (error) throw error;
+          return true;
         } else {
-          setAuthError('Хадгалагдсан мэдээлэл олдсонгүй.');
+          setAuthError(T.auth?.errors?.noSavedCredentials || 'Хадгалагдсан мэдээлэл олдсонгүй.');
+          return false;
         }
       }
+      return false;
     } catch (error: any) {
       console.error('Biometric Auth Error:', error);
       setAuthError('Биометрик нэвтрэлт амжилтгүй: ' + error.message);
+      return false;
     } finally {
       setIsProcessing(false);
     }
@@ -96,18 +100,18 @@ export const useAuth = () => {
     // Add a callback to ask the user if they want to save biometrics
     // This will be triggered from the UI component (index.tsx)
     promptToSaveBiometrics: (onConfirm: () => void) => void
-  ) => {
+  ): Promise<boolean> => {
     if (!authPhone || !authPass || (authMode === 'register' && !authName)) {
-      setAuthError('Мэдээллээ бүрэн оруулна уу.');
-      return;
+      setAuthError(T.auth?.errors?.fillAllFields || 'Мэдээллээ бүрэн оруулна уу.');
+      return false;
     }
     if (authPass.length < 6) {
-      setAuthError('Нууц үг 6-аас доошгүй тэмдэгттэй байх ёстой.');
-      return;
+      setAuthError(T.auth?.errors?.passTooShort || 'Нууц үг 6-аас доошгүй тэмдэгттэй байх ёстой.');
+      return false;
     }
     if (authPhone.length !== 8) {
-      setAuthError('Утасны дугаар 8 оронтой байх ёстой.');
-      return;
+      setAuthError(T.auth?.errors?.invalidPhone || 'Утасны дугаар 8 оронтой байх ёстой.');
+      return false;
     }
 
     setIsProcessing(true);
@@ -133,31 +137,34 @@ export const useAuth = () => {
       // Ask to save biometric info instead of saving automatically
       if (data.user) {
         // Нэвтрэлт амжилттай болбол дугаарыг хадгалах
-        await SecureStore.setItemAsync('last_login_phone', authPhone);
+        await setItemAsync('last_login_phone', authPhone);
 
         const hasHardware = await LocalAuthentication.hasHardwareAsync();
         const isEnrolled = await LocalAuthentication.isEnrolledAsync();
         if (hasHardware && isEnrolled) {
           // Call the prompt function passed from the UI
           promptToSaveBiometrics(async () => {
-            await SecureStore.setItemAsync('user_phone', authPhone);
-            await SecureStore.setItemAsync('user_pass', authPass);
+            await setItemAsync('user_phone', authPhone);
+            await setItemAsync('user_pass', authPass);
             setCanUseBiometric(true); // Update state immediately
           });
         }
+        return true;
       }
+      return false;
 
     } catch (error: any) {
       if (error.message.includes('Invalid login credentials')) {
         // Supabase usually returns this for both wrong password and non-existent user for security reasons.
-        setAuthError('Утасны дугаар эсвэл нууц үг буруу байна.');
+        setAuthError(T.auth?.errors?.invalidCredentials || 'Утасны дугаар эсвэл нууц үг буруу байна.');
       } else if (error.message.includes('User not found')) { // This is a hypothetical error, Supabase usually returns 'Invalid login credentials' for security. We add a check before login.
-        setAuthError('Бүртгэлгүй хэрэглэгч байна.');
+        setAuthError(T.auth?.errors?.userNotFound || 'Бүртгэлгүй хэрэглэгч байна.');
       } else if (error.message.includes('User already registered')) {
-        setAuthError('Энэ дугаар бүртгэлтэй байна.');
+        setAuthError(T.auth?.errors?.userExists || 'Энэ дугаар бүртгэлтэй байна.');
       } else {
         setAuthError(error.message);
       }
+      return false;
     } finally {
       setIsProcessing(false);
     }
@@ -169,8 +176,8 @@ export const useAuth = () => {
 
   const clearBiometricCredentials = async () => {
     // Clear saved credentials
-    await SecureStore.deleteItemAsync('user_phone');
-    await SecureStore.deleteItemAsync('user_pass');
+    await deleteItemAsync('user_phone');
+    await deleteItemAsync('user_pass');
     setCanUseBiometric(false);
   };
 

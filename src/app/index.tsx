@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 // Төслийн үндсэн хавтсанд байгаа файлуудыг зөв замаар дуудах (../../ ашиглана)
+import { getItemAsync, setItemAsync } from 'expo-secure-store';
 import { styles } from '../../my-payment-app/styles';
 import { translations } from '../../my-payment-app/translations';
 
@@ -44,36 +45,59 @@ export default function Index() {
   const blob3Anim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    const animate = (val: Animated.Value, duration: number) => {
+    const animate = (val: Animated.Value, duration: number, delay = 0) => {
       Animated.loop(
         Animated.sequence([
+          Animated.delay(delay),
           Animated.timing(val, { toValue: 1, duration, useNativeDriver: true }),
           Animated.timing(val, { toValue: 0, duration, useNativeDriver: true }),
         ])
       ).start();
     };
-    animate(blob1Anim, 15000);
-    animate(blob2Anim, 20000);
-    animate(blob3Anim, 25000);
+    animate(blob1Anim, 18000, 0);
+    animate(blob2Anim, 25000, 1500);
+    animate(blob3Anim, 22000, 3000);
   }, []);
 
   const blob1Style = {
     transform: [
-      { translateX: blob1Anim.interpolate({ inputRange: [0, 1], outputRange: [0, 50] }) },
-      { translateY: blob1Anim.interpolate({ inputRange: [0, 1], outputRange: [0, 30] }) },
+      { translateX: blob1Anim.interpolate({ inputRange: [0, 1], outputRange: [0, 80] }) },
+      { translateY: blob1Anim.interpolate({ inputRange: [0, 1], outputRange: [0, 40] }) },
     ],
   };
   const blob2Style = {
     transform: [
-      { translateX: blob2Anim.interpolate({ inputRange: [0, 1], outputRange: [0, -60] }) },
-      { translateY: blob2Anim.interpolate({ inputRange: [0, 1], outputRange: [0, -40] }) },
+      { translateX: blob2Anim.interpolate({ inputRange: [0, 1], outputRange: [0, -100] }) },
+      { translateY: blob2Anim.interpolate({ inputRange: [0, 1], outputRange: [0, -70] }) },
     ],
   };
   const blob3Style = {
     transform: [
-      { scale: blob3Anim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.2] }) },
-      { translateX: blob3Anim.interpolate({ inputRange: [0, 1], outputRange: [0, 30] }) },
+      { scale: blob3Anim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.3] }) },
+      { translateX: blob3Anim.interpolate({ inputRange: [0, 1], outputRange: [0, 60] }) },
+      { translateY: blob3Anim.interpolate({ inputRange: [0, 1], outputRange: [0, -50] }) },
     ],
+  };
+
+  // --- LANGUAGE LOGIC ---
+  const [appLanguage, setAppLanguage] = useState('MN');
+  const T = (translations as any)[appLanguage] || (translations as any)['MN'];
+
+  // Апп ачааллахад хадгалсан хэлийг унших
+  useEffect(() => {
+    const loadLanguage = async () => {
+      const savedLang = await getItemAsync('app_language');
+      if (savedLang) {
+        setAppLanguage(savedLang);
+      }
+    };
+    loadLanguage();
+  }, []);
+
+  // Хэл солих функцийг persistence-тэй болгох
+  const changeLanguage = async (lang: string) => {
+    setAppLanguage(lang);
+    await setItemAsync('app_language', lang);
   };
 
   // --- AUTHENTICATION LOGIC (useAuth hook-оос авна) ---
@@ -96,7 +120,7 @@ export default function Index() {
     clearBiometricCredentials,
     isProcessing, 
     authError 
-  } = useAuth();
+  } = useAuth(T);
 
   // --- USER PROFILE LOGIC (useUserProfile hook-оос авна) ---
   const {
@@ -116,16 +140,16 @@ export default function Index() {
   // --- TRANSFER LOGIC (useTransfer hook-оос авна) ---
   const { isTransferring, transferError, handleTransfer, setTransferError } = useTransfer(user, mainBalance, setMainBalance);
 
-  const [appLanguage, setAppLanguage] = useState('MN');
-  const T = (translations as any)[appLanguage] || (translations as any)['MN'];
-
   const [currentTab, setCurrentTab] = useState('home');
 
   useEffect(() => {
+    // Хэрэглэгч солигдох эсвэл системээс гарах үед мэдэгдлийн жагсаалтыг цэвэрлэх
+    setNotificationList([]);
+
     if (isAuthenticated) {
       setCurrentTab('home');
     }
-  }, [isAuthenticated]);
+  }, [user?.id, isAuthenticated]);
 
   const [showAIChat, setShowAIChat] = useState(false);
   
@@ -135,11 +159,7 @@ export default function Index() {
   const [isSearching, setIsSearching] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
 
-  const [notificationList, setNotificationList] = useState([
-    { id: 1, title: 'Амжилттай', desc: '5,000₮-н цэнэглэлт амжилттай боллоо.', time: '10 минутын өмнө', icon: 'check-circle' as const, color: '#10B981' },
-    { id: 2, title: 'Урамшуулал', desc: 'Найзаа уриад 1GB дата аваарай.', time: '2 цагийн өмнө', icon: 'gift' as const, color: '#F59E0B' },
-    { id: 3, title: 'Анхааруулга', desc: 'Таны дата 500MB үлдсэн байна.', time: '1 өдрийн өмнө', icon: 'alert-triangle' as const, color: '#EF4444' },
-  ]);
+  const [notificationList, setNotificationList] = useState<any[]>([]);
 
   const [customAlert, setCustomAlert] = useState<{
     visible: boolean;
@@ -585,8 +605,8 @@ export default function Index() {
             isProcessing={isProcessing} // This prop is incorrect, handleAuth is a function. Let's fix this.
             // The handleAuth function now needs a callback to show the prompt.
             // We will wrap the original handleAuth from the hook.
-            onAuthRequest={() => {
-              handleAuth((onConfirm) => {
+            onAuthRequest={async () => {
+              const success = await handleAuth((onConfirm) => {
                 setCustomAlert({
                   visible: true,
                   message: 'Дараагийн удаа хурууны хээ/царайгаар нэвтрэх үү?',
@@ -605,10 +625,18 @@ export default function Index() {
                   ]
                 })
               });
+              if (success) {
+                addNotification('Амжилттай', authMode === 'login' ? 'Системд амжилттай нэвтэрлээ.' : 'Бүртгэл амжилттай үүслээ.', 'check-circle', '#10B981');
+              }
             }}
             authError={authError}
             canUseBiometric={canUseBiometric}
-            handleBiometricLogin={handleBiometricLogin}
+            handleBiometricLogin={async () => {
+              const success = await handleBiometricLogin();
+              if (success) {
+                addNotification('Амжилттай', 'Биометрикээр амжилттай нэвтэрлээ.', 'fingerprint', '#7C3AED', 'material');
+              }
+            }}
           />
         ) : (
           <View style={{ flex: 1 }}>
@@ -670,7 +698,7 @@ export default function Index() {
                     handleLogout();
                   }
                 }}
-                appLanguage={appLanguage} setAppLanguage={setAppLanguage} 
+                appLanguage={appLanguage} setAppLanguage={changeLanguage} 
                 setActiveAction={setActiveAction} 
                 setShowAIChat={setShowAIChat} 
                 handleLogout={handleLogout}

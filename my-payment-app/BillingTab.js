@@ -150,6 +150,38 @@ const BillingTab = ({
           ))}
         </View>
       )}
+
+      {/* Автомат тохиргоо - Зөвхөн Postpaid үед */}
+      <Text style={styles.sectionTitleInternal}>Автомат тохиргоо (Auto-Pay)</Text>
+      <View style={{ backgroundColor: '#1C1C24', padding: 16, borderRadius: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, borderWidth: 1, borderColor: '#2D2D3A' }}>
+        <View style={{ flex: 1, paddingRight: 12 }}>
+          <Text style={{ color: '#FFF', fontSize: 15, fontWeight: '600' }}>Төлбөр автомат суутгал</Text>
+          <Text style={{ color: '#9CA3AF', fontSize: 12, marginTop: 4 }}>Сар бүр нэхэмжлэх гарах үед холбосон картаас автоматаар төлөгдөнө.</Text>
+        </View>
+        <TouchableOpacity 
+          onPress={() => setAutoPayEnabled(!autoPayEnabled)}
+          style={{ 
+            width: 48, height: 26, borderRadius: 13, 
+            backgroundColor: autoPayEnabled ? '#10B981' : '#374151', 
+            padding: 2, justifyContent: 'center'
+          }}>
+          <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: '#FFF', alignSelf: autoPayEnabled ? 'flex-end' : 'flex-start' }} />
+        </TouchableOpacity>
+      </View>
+
+      {/* Өмнөх нэхэмжлэхүүд - Зөвхөн Postpaid үед */}
+      {[
+          { month: '5-р сар', date: '2026.05.01', amount: '28,000', status: 'Төлөгдсөн', color: '#10B981' },
+          { month: '4-р сар', date: '2026.04.01', amount: '32,400', status: 'Төлөгдсөн', color: '#10B981' },
+      ].map((item, index) => (
+        <TouchableOpacity key={index} style={styles.categoryCard} onPress={() => setCustomAlert({ visible: true, message: `${item.month}ын төлбөр төлөгдсөн байна.` })}>
+            <View style={[styles.categoryIconBg, { backgroundColor: '#374151' }]}><Feather name="file-text" size={18} color="#FFF" /></View>
+            <View style={{ flex: 1, marginLeft: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <View><Text style={styles.categoryName}>{item.month}ын төлбөр</Text><Text style={{ color: item.color, fontSize: 11, marginTop: 2 }}>{item.status}</Text></View>
+                <View style={{ alignItems: 'flex-end' }}><Text style={{ color: '#FFF', fontWeight: 'bold' }}>₮{item.amount}</Text></View>
+            </View>
+        </TouchableOpacity>
+      ))}
       </>
       ) : (
         <View style={localStyles.prepaidContainer}>
@@ -166,8 +198,7 @@ const BillingTab = ({
           </View>
         </View>
       )}
-      {/* Эндээс доошхи бүх элементүүдийг нэг Fragment дотор оруулсан */}
-
+      
       {/* Картууд */}
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <Text style={[styles.sectionTitleInternal, { marginTop: 0, marginBottom: 0 }]}>Миний картууд</Text>
@@ -190,38 +221,6 @@ const BillingTab = ({
             <Text style={{ color: '#6B7280', fontSize: 13, marginLeft: 4 }}>Хадгалсан карт байхгүй.</Text>
           )}
       </ScrollView>
-
-      {/* Автомат тохиргоо */}
-      <Text style={styles.sectionTitleInternal}>Автомат тохиргоо (Auto-Pay)</Text>
-      <View style={{ backgroundColor: '#1C1C24', padding: 16, borderRadius: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, borderWidth: 1, borderColor: '#2D2D3A' }}>
-        <View style={{ flex: 1, paddingRight: 12 }}>
-          <Text style={{ color: '#FFF', fontSize: 15, fontWeight: '600' }}>Төлбөр автомат суутгал</Text>
-          <Text style={{ color: '#9CA3AF', fontSize: 12, marginTop: 4 }}>Сар бүр нэхэмжлэх гарах үед холбосон картаас автоматаар төлөгдөнө.</Text>
-        </View>
-        <TouchableOpacity 
-          onPress={() => setAutoPayEnabled(!autoPayEnabled)}
-          style={{ 
-            width: 48, height: 26, borderRadius: 13, 
-            backgroundColor: autoPayEnabled ? '#10B981' : '#374151', 
-            padding: 2, justifyContent: 'center'
-          }}>
-          <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: '#FFF', alignSelf: autoPayEnabled ? 'flex-end' : 'flex-start' }} />
-        </TouchableOpacity>
-      </View>
-
-      {/* Өмнөх нэхэмжлэхүүд */}
-      {[
-          { month: '5-р сар', date: '2026.05.01', amount: '28,000', status: 'Төлөгдсөн', color: '#10B981' },
-          { month: '4-р сар', date: '2026.04.01', amount: '32,400', status: 'Төлөгдсөн', color: '#10B981' },
-      ].map((item, index) => (
-        <TouchableOpacity key={index} style={styles.categoryCard} onPress={() => setCustomAlert({ visible: true, message: `${item.month}ын төлбөр төлөгдсөн байна.` })}>
-            <View style={[styles.categoryIconBg, { backgroundColor: '#374151' }]}><Feather name="file-text" size={18} color="#FFF" /></View>
-            <View style={{ flex: 1, marginLeft: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <View><Text style={styles.categoryName}>{item.month}ын төлбөр</Text><Text style={{ color: item.color, fontSize: 11, marginTop: 2 }}>{item.status}</Text></View>
-                <View style={{ alignItems: 'flex-end' }}><Text style={{ color: '#FFF', fontWeight: 'bold' }}>₮{item.amount}</Text></View>
-            </View>
-        </TouchableOpacity>
-      ))}
       <View style={{ height: 100 }} />
     </ScrollView>
   );

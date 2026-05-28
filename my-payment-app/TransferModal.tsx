@@ -27,6 +27,7 @@ interface TransferModalProps {
 const TransferModal: React.FC<TransferModalProps> = ({ 
   visible, 
   onClose, 
+  T,
   handleTransfer,
   isProcessing: isConfirming,
   error,
@@ -58,20 +59,31 @@ const TransferModal: React.FC<TransferModalProps> = ({
   };
 
   const handleVerifyRecipient = async () => {
-    if (target.length !== 8) {
-      setVerifyError("Утасны дугаар 8 оронтой байх ёстой.");
+    const isPhone = method === 'phone';
+    if (isPhone && target.length !== 8) {
+      setVerifyError(T.transfer?.invalidPhone || "Утасны дугаар 8 оронтой байх ёстой.");
       return;
     }
+    if (!isPhone && target.length < 5) {
+      setVerifyError(T.transfer?.invalidAccount || "Дансны дугаар буруу байна.");
+      return;
+    }
+
     setIsVerifying(true);
     setVerifyError('');
     setRecipientInfo(null);
 
-    const { data, error } = await supabase.rpc('get_user_by_phone', { phone_number: target }).single();
-
-    if (error || !data || !(data as any).full_name) {
-      setVerifyError("Уучлаарай, энэ дугаар бүртгэлгүй байна.");
+    if (isPhone) {
+      const { data, error } = await supabase.rpc('get_user_by_phone', { phone_number: target }).single();
+      if (error || !data || !(data as any).full_name) {
+        setVerifyError(T.transfer?.userNotFound || "Уучлаарай, энэ дугаар бүртгэлгүй байна.");
+      } else {
+        setRecipientInfo({ name: (data as any).full_name });
+      }
     } else {
-      setRecipientInfo({ name: (data as any).full_name });
+      // Дансны дугаар шалгах логик (Одоогоор жишээ нэр харуулна)
+      // Бодит апп дээр банкны API-аас нэр татаж ирнэ
+      setRecipientInfo({ name: "Хүлээн авагчийн нэр" });
     }
     setIsVerifying(false);
   };
@@ -114,13 +126,13 @@ const TransferModal: React.FC<TransferModalProps> = ({
                       <Text style={localStyles.optionSub}>Мөнгө, нэгж, дата шилжүүлэх</Text>
                     </View>
                   </TouchableOpacity>
-                  <View style={[localStyles.option, { opacity: 0.4 }]}>
+                  <TouchableOpacity onPress={() => { setMethod('account'); setStep(2); }} style={localStyles.option}>
                     <Feather name="credit-card" size={24} color="#3B82F6" />
                     <View style={{ marginLeft: 16 }}>
                       <Text style={localStyles.optionTitle}>Дансны дугаар руу</Text>
-                      <Text style={localStyles.optionSub}>Тун удахгүй...</Text>
+                      <Text style={localStyles.optionSub}>Бусад банкны дансаар шилжүүлэх</Text>
                     </View>
-                  </View>
+                  </TouchableOpacity>
                 </View>
               )}
 
@@ -134,7 +146,7 @@ const TransferModal: React.FC<TransferModalProps> = ({
                     keyboardType="numeric"
                     value={target}
                     onChangeText={setTarget}
-                    maxLength={8}
+                    maxLength={method === 'phone' ? 8 : 15}
                   />
                   {isVerifying ? (
                     <ActivityIndicator color="#7C3AED" style={{ marginVertical: 16 }} />
@@ -149,7 +161,7 @@ const TransferModal: React.FC<TransferModalProps> = ({
                       </TouchableOpacity>
                     </View>
                   ) : (
-                    <TouchableOpacity onPress={handleVerifyRecipient} disabled={target.length !== 8} style={[localStyles.mainBtn, target.length !== 8 && { opacity: 0.6 }]}>
+                    <TouchableOpacity onPress={handleVerifyRecipient} disabled={target.length < 5} style={[localStyles.mainBtn, target.length < 5 && { opacity: 0.6 }]}>
                       <Text style={localStyles.btnText}>Шалгах</Text>
                     </TouchableOpacity>
                   )}
